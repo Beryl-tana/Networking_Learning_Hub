@@ -388,7 +388,7 @@ export default function App() {
 
   const callClaude = async (msgs) => {
     try {
-      const res = await fetch("/.netlify/functions/chat", {
+      const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ model: "claude-sonnet-4-20250514", max_tokens: 1000, system: SYSTEM_PROMPT, messages: msgs }),
