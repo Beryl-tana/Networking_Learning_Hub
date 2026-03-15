@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef } from "react";
 
-const API_KEY = "YOUR_API_KEY_HERE";
 const LOGIN_USERNAME = "Tana training";
 const LOGIN_PASSWORD = "Tanatraining@2026";
 
@@ -389,14 +388,9 @@ export default function App() {
 
   const callClaude = async (msgs) => {
     try {
-      const res = await fetch("https://api.anthropic.com/v1/messages", {
+      const res = await fetch("/.netlify/functions/chat", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": API_KEY,
-          "anthropic-version": "2023-06-01",
-          "anthropic-dangerous-direct-browser-access": "true",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ model: "claude-sonnet-4-20250514", max_tokens: 1000, system: SYSTEM_PROMPT, messages: msgs }),
       });
       const data = await res.json();
