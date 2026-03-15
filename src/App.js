@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react"; // useRef kept for usePacketAnim
+import { useState, useEffect, useRef } from "react";
 
 const LOGIN_USERNAME = "Tana training";
 const LOGIN_PASSWORD = "Tanatraining@2026";
@@ -56,7 +56,6 @@ function usePacketAnim(devices, packets, running, speed) {
   const [positions, setPositions] = useState({});
   const animRef = useRef(null);
   const startRef = useRef(null);
-
   const devicesStr = JSON.stringify(devices);
   const packetsStr = JSON.stringify(packets);
 
@@ -64,13 +63,11 @@ function usePacketAnim(devices, packets, running, speed) {
     const devMap = {};
     JSON.parse(devicesStr).forEach(d => { devMap[d.id] = d; });
     const pkts = JSON.parse(packetsStr);
-
     const getCenter = (id) => {
       const d = devMap[id];
       if (!d) return {x:0,y:0};
-      return { x: d.x+(d.w||30), y: d.y+(d.h||30) };
+      return { x: d.x+(d.w||40), y: d.y+(d.h||40) };
     };
-
     if (!running) { setPositions({}); return; }
     startRef.current = null;
     const duration = 3.0 / speed;
@@ -105,69 +102,162 @@ function usePacketAnim(devices, packets, running, speed) {
   return positions;
 }
 
-function NetSimCanvas({ devices, links, packets, label, desc, color="#6366f1" }) {
+function NetSimCanvas({ devices: initialDevices, links: initialLinks, packets, label, desc, color="#6366f1" }) {
   const [running, setRunning] = useState(false);
   const [paused, setPaused] = useState(false);
   const [speed, setSpeed] = useState(1);
   const [selected, setSelected] = useState(null);
-  const positions = usePacketAnim(devices, packets, running && !paused, speed);
+  const [devPositions, setDevPositions] = useState(() => {
+    const map = {};
+    initialDevices.forEach(d => { map[d.id] = { x: d.x, y: d.y }; });
+    return map;
+  });
+  const [addedDevices, setAddedDevices] = useState([]);
+  const [troubleshootMode, setTroubleshootMode] = useState(false);
+  const [brokenLink, setBrokenLink] = useState(null);
+  const [fixedLinks, setFixedLinks] = useState([]);
+  const dragRef = useRef(null);
+  const didDragRef = useRef(false);
+  const svgRef = useRef(null);
+
+  const devices = [
+    ...initialDevices.map(d => ({ ...d, x: devPositions[d.id]?.x ?? d.x, y: devPositions[d.id]?.y ?? d.y })),
+    ...addedDevices.map(d => ({ ...d, x: devPositions[d.id]?.x ?? d.x, y: devPositions[d.id]?.y ?? d.y })),
+  ];
   const devMap = {};
-  devices.forEach(d => { devMap[d.id]=d; });
-  const restart = () => { setRunning(false); setTimeout(()=>setRunning(true),50); setPaused(false); };
+  devices.forEach(d => { devMap[d.id] = d; });
+
+  const activeLinks = initialLinks.map((lk, i) => ({
+    ...lk,
+    broken: troubleshootMode && i === brokenLink && !fixedLinks.includes(i),
+  }));
+
+  const handleSvgMouseMove = (e) => {
+    if (!dragRef.current) return;
+    const svgEl = svgRef.current;
+    if (!svgEl) return;
+    const rect = svgEl.getBoundingClientRect();
+    const scaleX = 700 / rect.width;
+    const scaleY = 380 / rect.height;
+    const dx = (e.clientX - dragRef.current.startX) * scaleX;
+    const dy = (e.clientY - dragRef.current.startY) * scaleY;
+    dragRef.current.startX = e.clientX;
+    dragRef.current.startY = e.clientY;
+    didDragRef.current = true;
+    const id = dragRef.current.id;
+    setDevPositions(prev => {
+      const old = prev[id] ?? { x: 0, y: 0 };
+      return { ...prev, [id]: { x: Math.max(0, Math.min(610, old.x + dx)), y: Math.max(0, Math.min(290, old.y + dy)) } };
+    });
+  };
+
+  const handleSvgMouseUp = () => { dragRef.current = null; };
+
+  const addDevice = (type) => {
+    const id = `added_${type}_${Date.now()}`;
+    const clrs = { router:"#f59e0b", pc:"#6366f1", switch:"#10b981", server:"#0ea5e9" };
+    const newDev = { id, type, label: type.charAt(0).toUpperCase()+type.slice(1), x: 300, y: 150, ip: "0.0.0.0", role: "Added device", color: clrs[type]||"#64748b" };
+    setAddedDevices(prev => [...prev, newDev]);
+    setDevPositions(prev => ({ ...prev, [id]: { x: 300, y: 150 } }));
+  };
+
+  const activateTroubleshoot = () => {
+    if (initialLinks.length === 0) return;
+    setBrokenLink(Math.floor(Math.random() * initialLinks.length));
+    setFixedLinks([]);
+    setTroubleshootMode(true);
+    setRunning(false);
+  };
+
+  const positions = usePacketAnim(devices, packets, running && !paused, speed);
+  const restart = () => { setRunning(false); setTimeout(() => setRunning(true), 50); setPaused(false); };
 
   return (
-    <div style={{background:"#f8fafc",borderRadius:14,overflow:"hidden",border:"1px solid #e2e8f0",height:"100%",display:"flex",flexDirection:"column"}}>
-      <div style={{background:"#1e293b",padding:"7px 12px",display:"flex",alignItems:"center",gap:7,flexShrink:0}}>
-        <button onClick={restart} style={{width:30,height:30,borderRadius:"50%",border:"none",background:"#ef4444",color:"#fff",cursor:"pointer",fontSize:13}}>↺</button>
-        <button onClick={()=>setPaused(p=>!p)} disabled={!running} style={{width:30,height:30,borderRadius:"50%",border:"none",background:"#64748b",color:"#fff",cursor:"pointer",fontSize:11,opacity:running?1:0.4}}>{paused?"▶":"⏸"}</button>
-        <button onClick={restart} style={{width:30,height:30,borderRadius:"50%",border:"none",background:running&&!paused?"#10b981":"#475569",color:"#fff",cursor:"pointer",fontSize:11}}>▶</button>
-        <button onClick={()=>setSpeed(s=>s===1?2:s===2?3:1)} style={{width:30,height:30,borderRadius:"50%",border:"none",background:color,color:"#fff",cursor:"pointer",fontWeight:700,fontSize:10}}>{speed}x</button>
-        <span style={{color:"#64748b",fontSize:10,marginLeft:4}}>{label}</span>
-        <span style={{flex:1}}/>
-        <span style={{color:"#475569",fontSize:9}}>Click device to inspect</span>
+    <div style={{background:"#e8edf2",borderRadius:14,overflow:"hidden",border:"1px solid #d1d9e0",height:"100%",display:"flex",flexDirection:"column"}}>
+      <div style={{background:"#1e293b",padding:"7px 12px",display:"flex",alignItems:"center",gap:6,flexShrink:0,flexWrap:"wrap"}}>
+        <button onClick={restart} style={{width:28,height:28,borderRadius:"50%",border:"none",background:"#ef4444",color:"#fff",cursor:"pointer",fontSize:13,fontWeight:700}}>↺</button>
+        <button onClick={()=>setPaused(p=>!p)} disabled={!running} style={{width:28,height:28,borderRadius:"50%",border:"none",background:"#64748b",color:"#fff",cursor:"pointer",fontSize:11,opacity:running?1:0.4}}>{paused?"▶":"⏸"}</button>
+        <button onClick={restart} style={{width:28,height:28,borderRadius:"50%",border:"none",background:running&&!paused?"#10b981":"#475569",color:"#fff",cursor:"pointer",fontSize:11}}>▶</button>
+        <button onClick={()=>setSpeed(s=>s===1?2:s===2?3:1)} style={{width:28,height:28,borderRadius:"50%",border:"none",background:color,color:"#fff",cursor:"pointer",fontWeight:700,fontSize:10}}>{speed}x</button>
+        <div style={{width:1,height:18,background:"rgba(255,255,255,0.15)",margin:"0 2px"}}/>
+        {["router","pc","switch"].map(t=>(
+          <button key={t} onClick={()=>addDevice(t)}
+            style={{height:24,padding:"0 8px",borderRadius:6,border:"none",background:"#334155",color:"#94a3b8",cursor:"pointer",fontSize:10,fontWeight:600}}>
+            + {t}
+          </button>
+        ))}
+        <div style={{width:1,height:18,background:"rgba(255,255,255,0.15)",margin:"0 2px"}}/>
+        <button
+          onClick={troubleshootMode ? ()=>{setTroubleshootMode(false);setBrokenLink(null);setFixedLinks([]);} : activateTroubleshoot}
+          style={{height:24,padding:"0 9px",borderRadius:6,border:"none",background:troubleshootMode?"#f59e0b":"#7c3aed",color:"#fff",cursor:"pointer",fontSize:10,fontWeight:600}}>
+          {troubleshootMode ? "Exit Fault" : "🔧 Fault Mode"}
+        </button>
+        <span style={{color:"#475569",fontSize:9,marginLeft:"auto"}}>Drag devices · Click to inspect</span>
       </div>
+      {troubleshootMode && (
+        <div style={{background:"rgba(124,58,237,0.12)",borderBottom:"1px solid rgba(124,58,237,0.2)",padding:"5px 14px",fontSize:10,color:"#c4b5fd",display:"flex",alignItems:"center",gap:8}}>
+          <span>🔧 <b>Fault injected!</b> A link is broken. Click the red ✕ link to fix it.</span>
+          {fixedLinks.length > 0 && <span style={{color:"#86efac",fontWeight:700}}>✅ Network restored!</span>}
+        </div>
+      )}
       <div style={{display:"flex",flex:1,overflow:"hidden"}}>
         <div style={{flex:1,position:"relative",overflow:"hidden"}}>
-          <svg width="100%" height="100%" viewBox="0 0 560 320" style={{position:"absolute",top:0,left:0}}>
-            {Array.from({length:12},(_,r)=>Array.from({length:19},(_,c)=><circle key={`${r}-${c}`} cx={c*30+15} cy={r*28+14} r="1" fill="#e2e8f0" opacity="0.5"/>))}
-            {links.map((lk,i)=>{
+          <svg ref={svgRef} width="100%" height="100%" viewBox="0 0 700 380"
+            style={{position:"absolute",top:0,left:0}}
+            onMouseMove={handleSvgMouseMove} onMouseUp={handleSvgMouseUp} onMouseLeave={handleSvgMouseUp}>
+            {Array.from({length:13},(_,r)=>Array.from({length:24},(_,c)=>(
+              <circle key={`${r}-${c}`} cx={c*30+15} cy={r*30+15} r="1.5" fill="#c8d3dc" opacity="0.6"/>
+            )))}
+            {activeLinks.map((lk,i)=>{
               const a=devMap[lk.from]; const b=devMap[lk.to];
               if(!a||!b) return null;
-              return <line key={i} x1={a.x+(a.w||30)} y1={a.y+(a.h||30)} x2={b.x+(b.w||30)} y2={b.y+(b.h||30)} stroke="#94a3b8" strokeWidth="2" strokeDasharray={lk.dashed?"6 3":"none"} opacity="0.7"/>;
+              const ax=a.x+40, ay=a.y+40, bx=b.x+40, by=b.y+40;
+              return (
+                <g key={i} onClick={()=>{ if(troubleshootMode && lk.broken) setFixedLinks(prev=>[...prev,i]); }} style={{cursor:lk.broken?"pointer":"default"}}>
+                  <line x1={ax} y1={ay} x2={bx} y2={by}
+                    stroke={lk.broken?"#ef4444":"#94a3b8"} strokeWidth={lk.broken?3:2.5}
+                    strokeDasharray={lk.broken?"8 4":lk.dashed?"6 3":"none"} opacity="0.9"/>
+                  {lk.broken && <text x={(ax+bx)/2} y={(ay+by)/2-10} textAnchor="middle" fontSize="18" fill="#ef4444">✕</text>}
+                </g>
+              );
             })}
             {devices.map(dev=>{
-              const isSel=selected?.id===dev.id;
-              const dc=dev.color||color;
+              const isSel = selected?.id === dev.id;
+              const dc = dev.color || color;
               return (
-                <g key={dev.id} onClick={()=>setSelected(isSel?null:dev)} style={{cursor:"pointer"}}>
-                  {isSel&&<circle cx={dev.x+(dev.w||30)} cy={dev.y+(dev.h||30)} r="30" fill={dc} opacity="0.12"/>}
-                  <foreignObject x={dev.x} y={dev.y} width="60" height="60">
-                    <div xmlns="http://www.w3.org/1999/xhtml" style={{transform:isSel?"scale(1.15)":"scale(1)",transition:"transform 0.15s",transformOrigin:"center"}}>
-                      <DeviceIcon type={dev.type} size={44} color={isSel?dc:(dev.color||"#475569")}/>
+                <g key={dev.id}
+                  onMouseDown={(e)=>{ e.preventDefault(); didDragRef.current=false; dragRef.current={id:dev.id,startX:e.clientX,startY:e.clientY}; }}
+                  onClick={()=>{ if(didDragRef.current){didDragRef.current=false;return;} setSelected(isSel?null:dev); }}
+                  style={{cursor:"grab"}}>
+                  {isSel && <circle cx={dev.x+40} cy={dev.y+40} r="50" fill={dc} opacity="0.1"/>}
+                  <foreignObject x={dev.x} y={dev.y} width="80" height="80">
+                    <div xmlns="http://www.w3.org/1999/xhtml" style={{transform:isSel?"scale(1.1)":"scale(1)",transition:"transform 0.15s",transformOrigin:"center",pointerEvents:"none",userSelect:"none"}}>
+                      <DeviceIcon type={dev.type} size={72} color={isSel ? dc : (dev.color||"#475569")}/>
                     </div>
                   </foreignObject>
-                  <text x={dev.x+(dev.w||30)} y={dev.y+62} textAnchor="middle" fontSize="10" fontWeight={isSel?"700":"500"} fill={isSel?dc:"#475569"}>{dev.label}</text>
+                  <text x={dev.x+40} y={dev.y+92} textAnchor="middle" fontSize="12" fontWeight={isSel?"700":"500"} fill={isSel?dc:"#334155"} style={{pointerEvents:"none",userSelect:"none"}}>{dev.label}</text>
                 </g>
               );
             })}
             {Object.entries(positions).map(([id,p])=>p.visible&&(
               <g key={id}>
-                <circle cx={p.x} cy={p.y} r="10" fill={p.color} opacity="0.2"/>
-                <circle cx={p.x} cy={p.y} r="6" fill={p.color}/>
-                <text x={p.x} y={p.y-12} textAnchor="middle" fontSize="9" fontWeight="700" fill={p.color}>{p.label}</text>
+                <circle cx={p.x} cy={p.y} r="12" fill={p.color} opacity="0.2"/>
+                <circle cx={p.x} cy={p.y} r="7" fill={p.color}/>
+                <text x={p.x} y={p.y-14} textAnchor="middle" fontSize="9" fontWeight="700" fill={p.color}>{p.label}</text>
               </g>
             ))}
           </svg>
-          {!running&&(
-            <div style={{position:"absolute",inset:0,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",background:"rgba(248,250,252,0.88)"}}>
-              <div style={{fontSize:12,color:"#64748b",marginBottom:10,textAlign:"center",padding:"0 16px"}}>{desc}</div>
-              <button onClick={restart} style={{padding:"10px 22px",borderRadius:10,background:color,color:"#fff",fontWeight:700,fontSize:"0.9rem",border:"none",cursor:"pointer"}}>▶ Start Simulation</button>
+          {!running && (
+            <div style={{position:"absolute",inset:0,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",background:"rgba(232,237,242,0.88)"}}>
+              <div style={{fontSize:12,color:"#64748b",marginBottom:10,textAlign:"center",padding:"0 20px"}}>{desc}</div>
+              <button onClick={restart} style={{padding:"10px 24px",borderRadius:10,background:color,color:"#fff",fontWeight:700,fontSize:"0.9rem",border:"none",cursor:"pointer"}}>▶ Start Simulation</button>
             </div>
           )}
         </div>
-        <div style={{width:170,background:"#fff",borderLeft:"1px solid #e2e8f0",padding:10,overflowY:"auto",fontSize:11}}>
+        <div style={{width:155,background:"#fff",borderLeft:"1px solid #e2e8f0",padding:10,overflowY:"auto",fontSize:11,flexShrink:0}}>
           {selected ? (
             <div>
+              <button onClick={()=>setSelected(null)} style={{fontSize:10,color:"#94a3b8",background:"none",border:"none",cursor:"pointer",marginBottom:6,padding:0}}>← back</button>
               <div style={{fontWeight:700,color:selected.color||color,marginBottom:7,fontSize:12}}>{selected.label}</div>
               {[["Type",selected.type],["IP",selected.ip||"N/A"],["Role",selected.role||"—"]].map(([k,v])=>(
                 <div key={k} style={{background:"#f8fafc",borderRadius:6,padding:"4px 7px",marginBottom:5}}>
@@ -175,7 +265,7 @@ function NetSimCanvas({ devices, links, packets, label, desc, color="#6366f1" })
                   <div style={{fontWeight:600,color:"#0f172a",fontFamily:k==="IP"?"monospace":"inherit",fontSize:10}}>{v}</div>
                 </div>
               ))}
-              {selected.info&&<div style={{marginTop:6,background:`${selected.color||color}12`,borderRadius:6,padding:"5px 7px",color:"#475569",lineHeight:1.5,fontSize:10}}>{selected.info}</div>}
+              {selected.info && <div style={{marginTop:6,background:`${selected.color||color}12`,borderRadius:6,padding:"5px 7px",color:"#475569",lineHeight:1.5,fontSize:10}}>{selected.info}</div>}
             </div>
           ) : (
             <div>
@@ -188,6 +278,9 @@ function NetSimCanvas({ devices, links, packets, label, desc, color="#6366f1" })
                   <span style={{color:"#475569",fontSize:10}}><b>{p.label}</b> {devMap[p.from]?.label}→{devMap[p.to]?.label}</span>
                 </div>
               ))}
+              <div style={{marginTop:10,padding:"7px 8px",background:"#f8fafc",borderRadius:7,fontSize:9,color:"#94a3b8",lineHeight:1.5}}>
+                Drag devices to rearrange. Add devices with the toolbar above.
+              </div>
             </div>
           )}
         </div>
@@ -208,10 +301,10 @@ function Mod1Sim() {
     {n:1,name:"Physical",color:"#f59e0b",proto:"Bits, electrical signals, light",ex:"Converts to actual bits sent over cable",data:"BITS"},
   ];
   const devices=[
-    {id:"pc",type:"pc",label:"Your PC",x:40,y:120,ip:"192.168.1.10",role:"Sender",color:"#6366f1",info:"Originates data. Encapsulates through all 5 layers before sending."},
-    {id:"sw",type:"switch",label:"Switch",x:180,y:180,ip:"N/A",role:"Layer 2 device",color:"#10b981",info:"Reads MAC addresses (Layer 2 only). Forwards frames within the LAN."},
-    {id:"router",type:"router",label:"Router",x:310,y:120,ip:"192.168.1.1",role:"Layer 3 device",color:"#f59e0b",info:"Reads IP addresses (Layer 3). Routes packets between different networks."},
-    {id:"srv",type:"server",label:"Server",x:430,y:180,ip:"93.184.216.34",role:"Receiver",color:"#8b5cf6",info:"Receives the frame and decapsulates through all layers back to the original data."},
+    {id:"pc",type:"pc",label:"Your PC",x:40,y:150,ip:"192.168.1.10",role:"Sender",color:"#6366f1",info:"Originates data. Encapsulates through all 5 layers before sending."},
+    {id:"sw",type:"switch",label:"Switch",x:205,y:225,ip:"N/A",role:"Layer 2 device",color:"#10b981",info:"Reads MAC addresses (Layer 2 only). Forwards frames within the LAN."},
+    {id:"router",type:"router",label:"Router",x:385,y:150,ip:"192.168.1.1",role:"Layer 3 device",color:"#f59e0b",info:"Reads IP addresses (Layer 3). Routes packets between different networks."},
+    {id:"srv",type:"server",label:"Server",x:545,y:225,ip:"93.184.216.34",role:"Receiver",color:"#8b5cf6",info:"Receives the frame and decapsulates through all layers back to the original data."},
   ];
   const links=[{from:"pc",to:"sw"},{from:"sw",to:"router"},{from:"router",to:"srv"}];
   const packets=[
@@ -220,7 +313,7 @@ function Mod1Sim() {
   ];
   return (
     <div style={{display:"flex",flexDirection:"column",gap:12,height:"100%"}}>
-      <div style={{height:240,flexShrink:0}}>
+      <div style={{height:340,flexShrink:0}}>
         <NetSimCanvas devices={devices} links={links} packets={packets} label="Network Devices" desc="See how data flows through a switch and router." color="#6366f1"/>
       </div>
       <div style={{flex:1,display:"flex",gap:10,minHeight:0}}>
@@ -256,6 +349,43 @@ function Mod1Sim() {
             {["Start: raw application data (e.g. HTTP request)","Transport wraps in segment — adds port numbers","Network wraps in packet — adds source & dest IPs","Data Link wraps in frame — adds MAC addresses","Physical converts everything to 1s and 0s"][encapStep]}
           </div>
         </div>
+        <div style={{flex:1,background:"#fff",borderRadius:12,border:"1px solid #e2e8f0",padding:12,overflowY:"auto"}}>
+          <div style={{fontWeight:700,fontSize:12,color:"#0f172a",marginBottom:8}}>Physical & Data Link Layers</div>
+          <div style={{fontSize:9,fontWeight:700,color:"#94a3b8",textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:6}}>Cable Types (Physical Layer)</div>
+          {[
+            {name:"Cat5e",speed:"1 Gbps",color:"#6366f1",note:"Standard twisted pair — home & office"},
+            {name:"Cat6",speed:"10 Gbps",color:"#8b5cf6",note:"Better shielding, shorter 10G range"},
+            {name:"Fibre",speed:"100 Gbps+",color:"#0ea5e9",note:"Light pulses through glass — long distance"},
+            {name:"Coaxial",speed:"Legacy",color:"#94a3b8",note:"Used in older cable TV/broadband"},
+          ].map((c,i)=>(
+            <div key={i} style={{display:"flex",alignItems:"center",gap:7,padding:"5px 8px",borderRadius:7,marginBottom:4,background:`${c.color}0d`,border:`1px solid ${c.color}30`}}>
+              <div style={{width:44,textAlign:"center",fontWeight:800,fontSize:9,color:c.color}}>{c.name}</div>
+              <div style={{width:44,textAlign:"center",fontSize:9,fontWeight:700,color:"#0f172a"}}>{c.speed}</div>
+              <div style={{fontSize:9,color:"#64748b",flex:1}}>{c.note}</div>
+            </div>
+          ))}
+          <div style={{fontSize:9,fontWeight:700,color:"#94a3b8",textTransform:"uppercase",letterSpacing:"0.08em",margin:"10px 0 6px"}}>Hub vs Switch</div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6,marginBottom:10}}>
+            {[["Hub","Broadcasts to ALL ports. Creates one big collision domain. Obsolete.","#f59e0b"],["Switch","Learns MAC table. Sends only to the correct port. Modern standard.","#10b981"]].map(([name,desc,clr])=>(
+              <div key={name} style={{background:`${clr}0d`,border:`1px solid ${clr}30`,borderRadius:8,padding:"7px 8px"}}>
+                <div style={{fontWeight:700,fontSize:11,color:clr,marginBottom:3}}>{name}</div>
+                <div style={{fontSize:9,color:"#64748b",lineHeight:1.5}}>{desc}</div>
+              </div>
+            ))}
+          </div>
+          <div style={{fontSize:9,fontWeight:700,color:"#94a3b8",textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:6}}>ARP — Address Resolution Protocol</div>
+          {[
+            {step:"1",text:"PC wants to send to 192.168.1.1 but needs its MAC address"},
+            {step:"2",text:"Broadcasts: 'Who has 192.168.1.1? Tell 192.168.1.10'"},
+            {step:"3",text:"Router replies: '192.168.1.1 is at AA:BB:CC:DD:EE:FF'"},
+            {step:"4",text:"PC caches the result and sends the Ethernet frame"},
+          ].map((s,i)=>(
+            <div key={i} style={{display:"flex",gap:6,marginBottom:4,alignItems:"flex-start"}}>
+              <div style={{width:18,height:18,borderRadius:"50%",background:"#6366f1",color:"#fff",fontSize:9,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>{s.step}</div>
+              <div style={{fontSize:10,color:"#475569",lineHeight:1.5}}>{s.text}</div>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -276,10 +406,10 @@ function Mod2Sim() {
   };
   const devices=[
     {id:"pc1",type:"pc",label:"PC 1",x:30,y:100,ip:"10.0.0.10",role:"Host — Network A",color:"#6366f1",info:"In Network A (10.0.0.x /24). Can talk to PC2 directly. Needs router to reach Server."},
-    {id:"pc2",type:"laptop",label:"PC 2",x:30,y:220,ip:"10.0.0.11",role:"Host — Network A",color:"#6366f1",info:"Same /24 subnet as PC1. Direct communication possible without a router."},
-    {id:"router",type:"router",label:"Router",x:230,y:155,ip:"10.0.0.1 / 172.16.0.1",role:"Default Gateway",color:"#f59e0b",info:"Connects Network A to Network B. Maintains a routing table to forward packets."},
-    {id:"srv1",type:"server",label:"Server",x:400,y:100,ip:"172.16.0.20",role:"Host — Network B",color:"#0ea5e9",info:"In Network B (172.16.0.x /24). Needs the router to receive packets from PC1."},
-    {id:"srv2",type:"server",label:"PC 3",x:400,y:220,ip:"172.16.0.21",role:"Host — Network B",color:"#0ea5e9",info:"Same subnet as Server. Can communicate with Server directly."},
+    {id:"pc2",type:"laptop",label:"PC 2",x:30,y:265,ip:"10.0.0.11",role:"Host — Network A",color:"#6366f1",info:"Same /24 subnet as PC1. Direct communication possible without a router."},
+    {id:"router",type:"router",label:"Router",x:270,y:175,ip:"10.0.0.1 / 172.16.0.1",role:"Default Gateway",color:"#f59e0b",info:"Connects Network A to Network B. Maintains a routing table to forward packets."},
+    {id:"srv1",type:"server",label:"Server",x:500,y:100,ip:"172.16.0.20",role:"Host — Network B",color:"#0ea5e9",info:"In Network B (172.16.0.x /24). Needs the router to receive packets from PC1."},
+    {id:"srv2",type:"server",label:"PC 3",x:500,y:265,ip:"172.16.0.21",role:"Host — Network B",color:"#0ea5e9",info:"Same subnet as Server. Can communicate with Server directly."},
   ];
   const links=[{from:"pc1",to:"router"},{from:"pc2",to:"router"},{from:"router",to:"srv1"},{from:"router",to:"srv2"}];
   const packets=[
@@ -289,7 +419,7 @@ function Mod2Sim() {
   const netBits=subnetVis; const hostBits=32-netBits; const hosts=Math.pow(2,hostBits)-2;
   return (
     <div style={{display:"flex",flexDirection:"column",gap:10,height:"100%"}}>
-      <div style={{height:230,flexShrink:0}}>
+      <div style={{height:340,flexShrink:0}}>
         <NetSimCanvas devices={devices} links={links} packets={packets} label="Routing Between Networks" desc="Watch packets route between two IP networks via a router." color="#0ea5e9"/>
       </div>
       <div style={{flex:1,display:"flex",gap:10,minHeight:0}}>
@@ -327,14 +457,55 @@ function Mod2Sim() {
             ))}
           </div>
           <div style={{display:"flex",gap:6,marginBottom:6}}>
-            {[["Network bits",netBits,"#e0f2fe","#0369a1"],["Host bits",hostBits,"#ecfdf5","#065f46"],["Usable hosts",hosts.toLocaleString(),"#fffbeb","#92400e"]].map(([label,val,bg,tc])=>(
-              <div key={label} style={{flex:1,background:bg,borderRadius:5,padding:"4px 6px",textAlign:"center"}}>
-                <div style={{fontSize:9,color:tc}}>{label}</div>
+            {[["Network bits",netBits,"#e0f2fe","#0369a1"],["Host bits",hostBits,"#ecfdf5","#065f46"],["Usable hosts",hosts.toLocaleString(),"#fffbeb","#92400e"]].map(([lbl,val,bg,tc])=>(
+              <div key={lbl} style={{flex:1,background:bg,borderRadius:5,padding:"4px 6px",textAlign:"center"}}>
+                <div style={{fontSize:9,color:tc}}>{lbl}</div>
                 <div style={{fontWeight:700,color:tc,fontSize:11}}>{val}</div>
               </div>
             ))}
           </div>
           <div style={{fontSize:10,color:"#64748b"}}>/{subnetVis} means first {netBits} bits = network, remaining {hostBits} bits = hosts.</div>
+        </div>
+        <div style={{flex:1,background:"#fff",borderRadius:12,border:"1px solid #e2e8f0",padding:12,overflowY:"auto"}}>
+          <div style={{fontWeight:700,fontSize:12,color:"#0f172a",marginBottom:8}}>Routing Table</div>
+          <div style={{fontSize:10,color:"#64748b",marginBottom:8}}>Routers forward packets by matching destination IP against the routing table (most specific match wins).</div>
+          <div style={{overflowX:"auto",marginBottom:10}}>
+            <table style={{width:"100%",borderCollapse:"collapse",fontSize:9}}>
+              <thead>
+                <tr style={{background:"#f8fafc"}}>
+                  {["Destination","Mask","Next Hop","Interface"].map(h=>(
+                    <th key={h} style={{padding:"4px 6px",textAlign:"left",color:"#64748b",fontWeight:700,borderBottom:"1px solid #e2e8f0",whiteSpace:"nowrap"}}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {[
+                  ["10.0.0.0","/24","Direct","eth0","#6366f1"],
+                  ["172.16.0.0","/24","Direct","eth1","#0ea5e9"],
+                  ["192.168.5.0","/24","10.0.0.254","eth0","#10b981"],
+                  ["0.0.0.0","/0","203.0.113.1","eth1","#f59e0b"],
+                ].map(([dest,mask,hop,iface,clr],i)=>(
+                  <tr key={i} style={{borderBottom:"1px solid #f1f5f9"}}>
+                    <td style={{padding:"4px 6px",fontFamily:"monospace",color:clr,fontWeight:700}}>{dest}</td>
+                    <td style={{padding:"4px 6px",fontFamily:"monospace",color:"#475569"}}>{mask}</td>
+                    <td style={{padding:"4px 6px",fontFamily:"monospace",color:"#334155"}}>{hop}</td>
+                    <td style={{padding:"4px 6px",fontFamily:"monospace",color:"#64748b"}}>{iface}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div style={{fontSize:9,color:"#64748b",marginBottom:10}}>0.0.0.0/0 = <b>default route</b> — catch-all when no specific match exists.</div>
+          <div style={{fontSize:9,fontWeight:700,color:"#94a3b8",textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:6}}>Static vs Dynamic Routing</div>
+          {[
+            {name:"Static",color:"#6366f1",desc:"Manually configured by admin. Simple, predictable, no overhead. Used for small/stub networks."},
+            {name:"Dynamic (RIP/OSPF/BGP)",color:"#10b981",desc:"Routers share routes automatically. Adapts to failures. OSPF = enterprise LAN, BGP = internet backbone."},
+          ].map((r,i)=>(
+            <div key={i} style={{padding:"7px 9px",borderRadius:8,background:`${r.color}0d`,border:`1px solid ${r.color}30`,marginBottom:6}}>
+              <div style={{fontWeight:700,fontSize:10,color:r.color,marginBottom:3}}>{r.name}</div>
+              <div style={{fontSize:9,color:"#64748b",lineHeight:1.5}}>{r.desc}</div>
+            </div>
+          ))}
         </div>
       </div>
     </div>
@@ -357,9 +528,9 @@ function Mod3Sim() {
     else setHRunning(false);
   },[hRunning,hStep,hSteps.length]);
   const devices=[
-    {id:"client",type:"pc",label:"Client",x:40,y:110,ip:"192.168.1.10",role:"Initiates TCP connection",color:"#6366f1",info:"Starts the handshake with SYN. Must complete 3-way handshake before data can flow."},
-    {id:"fw",type:"router",label:"Firewall",x:200,y:155,ip:"10.0.0.1",role:"Packet filter",color:"#ef4444",info:"Inspects packets by port. Allows 443 (HTTPS), blocks 23 (Telnet)."},
-    {id:"server",type:"server",label:"Web Server",x:360,y:110,ip:"93.184.216.34",role:"Listens on port 443",color:"#10b981",info:"LISTENING on port 443. Responds to SYN with SYN-ACK to accept the connection."},
+    {id:"client",type:"pc",label:"Client",x:40,y:140,ip:"192.168.1.10",role:"Initiates TCP connection",color:"#6366f1",info:"Starts the handshake with SYN. Must complete 3-way handshake before data can flow."},
+    {id:"fw",type:"router",label:"Firewall",x:295,y:180,ip:"10.0.0.1",role:"Packet filter",color:"#ef4444",info:"Inspects packets by port. Allows 443 (HTTPS), blocks 23 (Telnet)."},
+    {id:"server",type:"server",label:"Web Server",x:545,y:140,ip:"93.184.216.34",role:"Listens on port 443",color:"#10b981",info:"LISTENING on port 443. Responds to SYN with SYN-ACK to accept the connection."},
   ];
   const links=[{from:"client",to:"fw"},{from:"fw",to:"server"}];
   const packets=[
@@ -377,7 +548,7 @@ function Mod3Sim() {
   ];
   return (
     <div style={{display:"flex",flexDirection:"column",gap:10,height:"100%"}}>
-      <div style={{height:220,flexShrink:0}}>
+      <div style={{height:320,flexShrink:0}}>
         <NetSimCanvas devices={devices} links={links} packets={packets} label="TCP Connection Flow" desc="Watch a full TCP handshake then data transfer through a firewall." color="#10b981"/>
       </div>
       <div style={{flex:1,display:"flex",gap:10,minHeight:0}}>
@@ -411,6 +582,36 @@ function Mod3Sim() {
             </div>
           ))}
         </div>
+        <div style={{flex:1,background:"#fff",borderRadius:12,border:"1px solid #e2e8f0",padding:12,overflowY:"auto"}}>
+          <div style={{fontWeight:700,fontSize:12,color:"#0f172a",marginBottom:8}}>UDP & Application Layer</div>
+          <div style={{fontSize:9,fontWeight:700,color:"#94a3b8",textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:6}}>TCP vs UDP</div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:5,marginBottom:10}}>
+            {[
+              ["TCP","#10b981",["Connection-oriented","3-way handshake","Guaranteed delivery","In-order packets","Slower overhead","HTTP, FTP, SSH, SMTP"]],
+              ["UDP","#f59e0b",["Connectionless","No handshake","Best-effort delivery","No ordering guarantee","Low overhead","DNS, DHCP, VoIP, video"]],
+            ].map(([name,clr,pts])=>(
+              <div key={name} style={{background:`${clr}0d`,border:`1px solid ${clr}30`,borderRadius:8,padding:"7px 8px"}}>
+                <div style={{fontWeight:800,fontSize:12,color:clr,marginBottom:5,textAlign:"center"}}>{name}</div>
+                {pts.map((pt,i)=><div key={i} style={{fontSize:9,color:"#475569",marginBottom:2,display:"flex",alignItems:"flex-start",gap:4}}><span style={{color:clr,flexShrink:0}}>•</span>{pt}</div>)}
+              </div>
+            ))}
+          </div>
+          <div style={{fontSize:9,fontWeight:700,color:"#94a3b8",textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:6}}>Application Layer Protocols</div>
+          {[
+            {proto:"HTTP / HTTPS",port:"80 / 443",color:"#6366f1",use:"Web pages. HTTPS = encrypted with TLS/SSL."},
+            {proto:"DNS",port:"53 UDP",color:"#f59e0b",use:"Resolves domain names to IP addresses."},
+            {proto:"SMTP",port:"25 / 587",color:"#ec4899",use:"Sending email between servers."},
+            {proto:"IMAP / POP3",port:"993 / 995",color:"#0ea5e9",use:"Reading email from a mail server."},
+            {proto:"FTP / SFTP",port:"21 / 22",color:"#10b981",use:"File transfer. SFTP uses SSH encryption."},
+            {proto:"SSH",port:"22",color:"#8b5cf6",use:"Encrypted remote terminal access."},
+          ].map((p,i)=>(
+            <div key={i} style={{display:"flex",gap:7,padding:"5px 8px",borderRadius:7,marginBottom:4,background:`${p.color}0d`,border:`1px solid ${p.color}25`}}>
+              <div style={{width:70,fontWeight:700,fontSize:9,color:p.color,flexShrink:0}}>{p.proto}</div>
+              <div style={{width:42,fontFamily:"monospace",fontSize:9,color:"#94a3b8",flexShrink:0}}>{p.port}</div>
+              <div style={{fontSize:9,color:"#64748b"}}>{p.use}</div>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -433,11 +634,11 @@ function Mod4Sim() {
     else setDnsRunning(false);
   },[dnsRunning,dnsStep,dnsSteps.length]);
   const devices=[
-    {id:"client",type:"pc",label:"Your PC",x:30,y:140,ip:"192.168.1.10",role:"DHCP Client",color:"#6366f1",info:"Gets IP via DHCP. Sends DNS queries to resolve domain names before connecting."},
-    {id:"router",type:"router",label:"Home Router",x:170,y:140,ip:"192.168.1.1",role:"DHCP Server + NAT",color:"#f59e0b",info:"Assigns IPs to local devices (DHCP). Translates private IPs to public IP (NAT)."},
-    {id:"isp",type:"server",label:"ISP Resolver",x:310,y:80,ip:"203.0.113.1",role:"DNS Resolver",color:"#0ea5e9",info:"Your ISP's DNS resolver. Caches frequently requested domains to speed up responses."},
-    {id:"dns",type:"server",label:"Auth DNS",x:430,y:80,ip:"8.8.8.8",role:"Authoritative DNS",color:"#10b981",info:"Returns the definitive IP address for a domain name."},
-    {id:"web",type:"server",label:"Web Server",x:430,y:220,ip:"142.250.4.100",role:"Destination",color:"#ec4899",info:"The server hosting the website. Responds to HTTP/HTTPS requests."},
+    {id:"client",type:"pc",label:"Your PC",x:30,y:170,ip:"192.168.1.10",role:"DHCP Client",color:"#6366f1",info:"Gets IP via DHCP. Sends DNS queries to resolve domain names before connecting."},
+    {id:"router",type:"router",label:"Home Router",x:185,y:170,ip:"192.168.1.1",role:"DHCP Server + NAT",color:"#f59e0b",info:"Assigns IPs to local devices (DHCP). Translates private IPs to public IP (NAT)."},
+    {id:"isp",type:"server",label:"ISP Resolver",x:365,y:90,ip:"203.0.113.1",role:"DNS Resolver",color:"#0ea5e9",info:"Your ISP's DNS resolver. Caches frequently requested domains to speed up responses."},
+    {id:"dns",type:"server",label:"Auth DNS",x:535,y:90,ip:"8.8.8.8",role:"Authoritative DNS",color:"#10b981",info:"Returns the definitive IP address for a domain name."},
+    {id:"web",type:"server",label:"Web Server",x:535,y:260,ip:"142.250.4.100",role:"Destination",color:"#ec4899",info:"The server hosting the website. Responds to HTTP/HTTPS requests."},
   ];
   const links=[{from:"client",to:"router"},{from:"router",to:"isp"},{from:"isp",to:"dns"},{from:"router",to:"web"},{from:"isp",to:"web"},{from:"dns",to:"isp",dashed:true}];
   const packets=[
@@ -454,7 +655,7 @@ function Mod4Sim() {
   ];
   return (
     <div style={{display:"flex",flexDirection:"column",gap:10,height:"100%"}}>
-      <div style={{height:230,flexShrink:0}}>
+      <div style={{height:340,flexShrink:0}}>
         <NetSimCanvas devices={devices} links={links} packets={packets} label="DNS + DHCP + NAT" desc="Watch a full web request — DNS lookup, NAT translation, HTTP response." color="#f59e0b"/>
       </div>
       <div style={{flex:1,display:"flex",gap:10,minHeight:0}}>
@@ -480,6 +681,34 @@ function Mod4Sim() {
             </div>
           ))}
         </div>
+        <div style={{flex:1,background:"#fff",borderRadius:12,border:"1px solid #e2e8f0",padding:12,overflowY:"auto"}}>
+          <div style={{fontWeight:700,fontSize:12,color:"#0f172a",marginBottom:8}}>VPNs & Proxies</div>
+          <div style={{fontSize:9,fontWeight:700,color:"#94a3b8",textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:6}}>VPN — Virtual Private Network</div>
+          <div style={{fontSize:10,color:"#64748b",marginBottom:7,lineHeight:1.5}}>Creates an <b>encrypted tunnel</b> over the public internet so traffic looks like it comes from the VPN server, not your device.</div>
+          {[
+            {type:"Site-to-Site VPN",color:"#6366f1",desc:"Connects two office networks permanently over the internet. Employees in Branch A can access servers in HQ as if they were local."},
+            {type:"Client VPN (Remote Access)",color:"#8b5cf6",desc:"Individual user connects their device to the company network. Used by remote workers. Common protocols: OpenVPN, WireGuard, IPSec."},
+            {type:"Split Tunneling",color:"#0ea5e9",desc:"Only traffic for the corporate network goes through the VPN. Regular browsing goes direct — saves bandwidth."},
+          ].map((v,i)=>(
+            <div key={i} style={{padding:"7px 9px",borderRadius:8,background:`${v.color}0d`,border:`1px solid ${v.color}30`,marginBottom:6}}>
+              <div style={{fontWeight:700,fontSize:10,color:v.color,marginBottom:3}}>{v.type}</div>
+              <div style={{fontSize:9,color:"#64748b",lineHeight:1.5}}>{v.desc}</div>
+            </div>
+          ))}
+          <div style={{fontSize:9,fontWeight:700,color:"#94a3b8",textTransform:"uppercase",letterSpacing:"0.08em",margin:"10px 0 6px"}}>Proxies</div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:5}}>
+            {[
+              ["Forward Proxy","#f59e0b","Client → Proxy → Internet","Sits in front of clients. Used for web filtering, caching, anonymity. Your school or company likely uses one."],
+              ["Reverse Proxy","#10b981","Internet → Proxy → Servers","Sits in front of servers. Used for load balancing, SSL termination, CDN. Nginx & HAProxy are examples."],
+            ].map(([name,clr,flow,desc])=>(
+              <div key={name} style={{background:`${clr}0d`,border:`1px solid ${clr}30`,borderRadius:8,padding:"7px 8px"}}>
+                <div style={{fontWeight:700,fontSize:10,color:clr,marginBottom:2}}>{name}</div>
+                <div style={{fontFamily:"monospace",fontSize:8,color:"#94a3b8",marginBottom:4}}>{flow}</div>
+                <div style={{fontSize:9,color:"#64748b",lineHeight:1.5}}>{desc}</div>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -489,10 +718,10 @@ function Mod4Sim() {
 function Mod5Sim() {
   const devices=[
     {id:"phone",type:"phone",label:"Phone",x:30,y:80,ip:"192.168.1.5",role:"WiFi 5GHz client",color:"#ec4899",info:"Connected on 5GHz. Fast speeds, shorter range. Uses 802.11ax (WiFi 6)."},
-    {id:"laptop",type:"laptop",label:"Laptop",x:30,y:220,ip:"192.168.1.6",role:"WiFi 2.4GHz client",color:"#6366f1",info:"Connected on 2.4GHz. Slower but better range through walls."},
-    {id:"router",type:"router",label:"WiFi Router",x:190,y:150,ip:"192.168.1.1",role:"Access Point + Router",color:"#f59e0b",info:"Broadcasts 2.4GHz and 5GHz simultaneously. Routes traffic to ISP."},
-    {id:"modem",type:"server",label:"ISP Modem",x:340,y:150,ip:"203.0.113.1",role:"WAN Gateway",color:"#0ea5e9",info:"Connects your home network to your ISP. Handles WAN protocol translation."},
-    {id:"isp",type:"cloud",label:"Internet",x:450,y:130,ip:"WAN",role:"The Internet",color:"#64748b",info:"The global internet. Your packets traverse multiple routers to reach servers worldwide."},
+    {id:"laptop",type:"laptop",label:"Laptop",x:30,y:260,ip:"192.168.1.6",role:"WiFi 2.4GHz client",color:"#6366f1",info:"Connected on 2.4GHz. Slower but better range through walls."},
+    {id:"router",type:"router",label:"WiFi Router",x:210,y:165,ip:"192.168.1.1",role:"Access Point + Router",color:"#f59e0b",info:"Broadcasts 2.4GHz and 5GHz simultaneously. Routes traffic to ISP."},
+    {id:"modem",type:"server",label:"ISP Modem",x:400,y:165,ip:"203.0.113.1",role:"WAN Gateway",color:"#0ea5e9",info:"Connects your home network to your ISP. Handles WAN protocol translation."},
+    {id:"isp",type:"cloud",label:"Internet",x:545,y:145,ip:"WAN",role:"The Internet",color:"#64748b",info:"The global internet. Your packets traverse multiple routers to reach servers worldwide."},
   ];
   const links=[{from:"phone",to:"router",dashed:true},{from:"laptop",to:"router",dashed:true},{from:"router",to:"modem"},{from:"modem",to:"isp"}];
   const packets=[
@@ -513,15 +742,15 @@ function Mod5Sim() {
   ];
   return (
     <div style={{display:"flex",flexDirection:"column",gap:10,height:"100%"}}>
-      <div style={{height:230,flexShrink:0}}>
+      <div style={{height:340,flexShrink:0}}>
         <NetSimCanvas devices={devices} links={links} packets={packets} label="Home Network to Internet" desc="See how WiFi devices connect through your router and ISP to the internet." color="#ec4899"/>
       </div>
       <div style={{flex:1,display:"flex",gap:10,minHeight:0}}>
         <div style={{flex:1,background:"#fff",borderRadius:12,border:"1px solid #e2e8f0",padding:12,overflowY:"auto"}}>
           <div style={{fontWeight:700,fontSize:12,color:"#0f172a",marginBottom:7}}>2.4 GHz vs 5 GHz</div>
-          {[["Range","████████","█████"],["Speed","████","████████"],["Congestion","High","Low"],["Wall penetration","Better","Weaker"]].map(([label,v24,v5],i)=>(
+          {[["Range","████████","█████"],["Speed","████","████████"],["Congestion","High","Low"],["Wall penetration","Better","Weaker"]].map(([lbl,v24,v5],i)=>(
             <div key={i} style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:3,marginBottom:5,alignItems:"center"}}>
-              <div style={{fontSize:10,fontWeight:600,color:"#475569"}}>{label}</div>
+              <div style={{fontSize:10,fontWeight:600,color:"#475569"}}>{lbl}</div>
               <div style={{background:"#eff6ff",borderRadius:5,padding:"3px 5px",textAlign:"center",fontSize:9,color:"#1d4ed8",fontFamily:"monospace"}}>{v24}</div>
               <div style={{background:"#ecfdf5",borderRadius:5,padding:"3px 5px",textAlign:"center",fontSize:9,color:"#065f46",fontFamily:"monospace"}}>{v5}</div>
             </div>
@@ -538,10 +767,14 @@ function Mod5Sim() {
           ))}
         </div>
         <div style={{flex:1,background:"#fff",borderRadius:12,border:"1px solid #e2e8f0",padding:12,overflowY:"auto"}}>
-          <div style={{fontWeight:700,fontSize:12,color:"#0f172a",marginBottom:7}}>WAN / Broadband Types</div>
+          <div style={{fontWeight:700,fontSize:12,color:"#0f172a",marginBottom:4}}>WAN / Broadband Types</div>
+          <div style={{padding:"6px 9px",borderRadius:8,background:"#fef3c7",border:"1px solid #fcd34d",marginBottom:7}}>
+            <div style={{fontWeight:700,fontSize:10,color:"#92400e",marginBottom:2}}>📞 POTS & Dial-up (Historical)</div>
+            <div style={{fontSize:9,color:"#78350f",lineHeight:1.5}}>Plain Old Telephone System — analog copper lines. Dial-up modems reached max <b>56 Kbps</b>. Required a phone call to connect; you couldn't use the phone while online. Dominated the 1990s ("You've Got Mail" era). Now obsolete, replaced by always-on broadband.</div>
+          </div>
           {wanTypes.map((w,i)=>(
-            <div key={i} style={{display:"flex",gap:8,padding:"8px 9px",borderRadius:9,marginBottom:7,background:`${w.color}0e`,border:`1px solid ${w.color}30`}}>
-              <div style={{width:34,height:34,borderRadius:9,background:w.color,display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,flexShrink:0}}>{w.icon}</div>
+            <div key={i} style={{display:"flex",gap:8,padding:"7px 9px",borderRadius:9,marginBottom:6,background:`${w.color}0e`,border:`1px solid ${w.color}30`}}>
+              <div style={{width:32,height:32,borderRadius:8,background:w.color,display:"flex",alignItems:"center",justifyContent:"center",fontSize:15,flexShrink:0}}>{w.icon}</div>
               <div><div style={{fontWeight:700,fontSize:11,color:"#0f172a"}}>{w.name} <span style={{fontSize:9,color:w.color,fontWeight:700}}>{w.speed}</span></div><div style={{fontSize:9,color:"#64748b"}}>{w.how}</div></div>
             </div>
           ))}
@@ -569,10 +802,10 @@ function Mod6Sim() {
     {n:5,name:"Application",color:"#6366f1",check:"Test DNS: nslookup google.com. Try different browser.",tools:"nslookup, browser dev tools"},
   ];
   const devices=[
-    {id:"pc",type:"pc",label:"Your PC",x:40,y:140,ip:"169.254.x.x",role:"Troubleshooting target",color:"#ef4444",info:"APIPA address (169.254.x.x) detected. DHCP failed — the PC couldn't get an IP from the router."},
-    {id:"sw",type:"switch",label:"Switch",x:190,y:190,ip:"N/A",role:"Layer 2",color:"#10b981",info:"Check all port LEDs. A dark LED = no physical link on that port."},
-    {id:"router",type:"router",label:"Router",x:330,y:140,ip:"192.168.1.1",role:"Default Gateway + DHCP",color:"#f59e0b",info:"Is it powered on? Can other devices get IPs? Try rebooting it first."},
-    {id:"isp",type:"server",label:"ISP",x:450,y:140,ip:"WAN",role:"Internet",color:"#64748b",info:"If router works but internet is down, the issue is with your ISP — call them."},
+    {id:"pc",type:"pc",label:"Your PC",x:40,y:165,ip:"169.254.x.x",role:"Troubleshooting target",color:"#ef4444",info:"APIPA address (169.254.x.x) detected. DHCP failed — the PC couldn't get an IP from the router."},
+    {id:"sw",type:"switch",label:"Switch",x:210,y:240,ip:"N/A",role:"Layer 2",color:"#10b981",info:"Check all port LEDs. A dark LED = no physical link on that port."},
+    {id:"router",type:"router",label:"Router",x:390,y:165,ip:"192.168.1.1",role:"Default Gateway + DHCP",color:"#f59e0b",info:"Is it powered on? Can other devices get IPs? Try rebooting it first."},
+    {id:"isp",type:"server",label:"ISP",x:560,y:165,ip:"WAN",role:"Internet",color:"#64748b",info:"If router works but internet is down, the issue is with your ISP — call them."},
   ];
   const links=[{from:"pc",to:"sw"},{from:"sw",to:"router"},{from:"router",to:"isp"}];
   const packets=[
@@ -581,7 +814,7 @@ function Mod6Sim() {
   ];
   return (
     <div style={{display:"flex",flexDirection:"column",gap:10,height:"100%"}}>
-      <div style={{height:230,flexShrink:0}}>
+      <div style={{height:340,flexShrink:0}}>
         <NetSimCanvas devices={devices} links={links} packets={packets} label="Network Fault Scenario" desc="A PC has an APIPA address (169.254.x.x). Diagnose the fault bottom-up." color="#ef4444"/>
       </div>
       <div style={{flex:1,display:"flex",gap:10,minHeight:0}}>
@@ -614,6 +847,40 @@ function Mod6Sim() {
           </div>
           <div style={{fontSize:9,color:"#94a3b8"}}>OSI Layer: {scenarios[scenario].layer+1} — {layers[scenarios[scenario].layer]?.name}</div>
         </div>
+        <div style={{flex:1,background:"#fff",borderRadius:12,border:"1px solid #e2e8f0",padding:12,overflowY:"auto"}}>
+          <div style={{fontWeight:700,fontSize:12,color:"#0f172a",marginBottom:8}}>The Cloud & IPv6</div>
+          <div style={{fontSize:9,fontWeight:700,color:"#94a3b8",textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:6}}>Cloud Service Models</div>
+          {[
+            {name:"IaaS",full:"Infrastructure as a Service",color:"#6366f1",ex:"AWS EC2, Azure VMs, Google Compute",desc:"Rent raw compute, storage, networking. You manage the OS and everything above."},
+            {name:"PaaS",full:"Platform as a Service",color:"#f59e0b",ex:"Heroku, Google App Engine, Azure App Service",desc:"Rent a managed platform. Deploy code without managing servers or OS."},
+            {name:"SaaS",full:"Software as a Service",color:"#10b981",ex:"Gmail, Office 365, Salesforce, Zoom",desc:"Use software over the internet. No installation, no servers — just a browser."},
+          ].map((c,i)=>(
+            <div key={i} style={{padding:"7px 9px",borderRadius:8,background:`${c.color}0d`,border:`1px solid ${c.color}30`,marginBottom:6}}>
+              <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:3}}>
+                <div style={{width:32,height:20,borderRadius:4,background:c.color,color:"#fff",fontSize:9,fontWeight:800,display:"flex",alignItems:"center",justifyContent:"center"}}>{c.name}</div>
+                <div style={{fontWeight:700,fontSize:10,color:"#0f172a"}}>{c.full}</div>
+              </div>
+              <div style={{fontSize:9,color:"#64748b",marginBottom:2}}>{c.desc}</div>
+              <div style={{fontSize:9,fontFamily:"monospace",color:c.color}}>e.g. {c.ex}</div>
+            </div>
+          ))}
+          <div style={{fontSize:9,fontWeight:700,color:"#94a3b8",textTransform:"uppercase",letterSpacing:"0.08em",margin:"10px 0 6px"}}>IPv6</div>
+          <div style={{padding:"7px 9px",borderRadius:8,background:"#f0f9ff",border:"1px solid #bae6fd",marginBottom:6}}>
+            <div style={{fontFamily:"monospace",fontSize:10,color:"#0369a1",fontWeight:700,marginBottom:3}}>2001:0db8:85a3::8a2e:0370:7334</div>
+            <div style={{fontSize:9,color:"#64748b"}}>128-bit address (vs IPv4's 32-bit). Written as 8 groups of 4 hex digits. <b>::</b> compresses consecutive zeros.</div>
+          </div>
+          {[
+            ["Why IPv6?","IPv4 only has ~4.3 billion addresses. With billions of devices, we ran out. IPv6 has 340 undecillion addresses."],
+            ["::1","Loopback address (same as 127.0.0.1 in IPv4)"],
+            ["Dual-Stack","Devices run IPv4 and IPv6 simultaneously during the transition period — most networks today."],
+            ["DNS tools","nslookup google.com · dig google.com · ipconfig /flushdns (clear cache)"],
+          ].map(([k,v],i)=>(
+            <div key={i} style={{display:"flex",gap:6,marginBottom:5}}>
+              <div style={{fontWeight:700,fontSize:9,color:"#0ea5e9",minWidth:70,flexShrink:0}}>{k}</div>
+              <div style={{fontSize:9,color:"#475569",lineHeight:1.5}}>{v}</div>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -623,14 +890,18 @@ function InfoPanel({ moduleId, color }) {
   const info = MODULE_INFO[moduleId];
   if (!info) return null;
   return (
-    <div style={{display:"flex",gap:10,marginTop:10,flexShrink:0}}>
-      <div style={{flex:1,background:"#fff",borderRadius:12,border:`1px solid ${color}30`,padding:"10px 14px"}}>
-        <div style={{fontWeight:700,fontSize:11,color:color,marginBottom:5,textTransform:"uppercase",letterSpacing:"0.06em"}}>⚙ What's happening</div>
-        <div style={{fontSize:11,color:"#475569",lineHeight:1.65}}>{info.whatHappens}</div>
+    <div style={{display:"flex",flexDirection:"column",gap:16}}>
+      <div>
+        <div style={{fontWeight:700,fontSize:11,color:color,marginBottom:8,textTransform:"uppercase",letterSpacing:"0.07em",display:"flex",alignItems:"center",gap:5}}>
+          <span>⚙</span> What's Happening
+        </div>
+        <div style={{fontSize:12,color:"#475569",lineHeight:1.7,background:"#f8fafc",borderRadius:10,padding:"10px 12px",border:`1px solid ${color}25`}}>{info.whatHappens}</div>
       </div>
-      <div style={{flex:1,background:`${color}08`,borderRadius:12,border:`1px solid ${color}30`,padding:"10px 14px"}}>
-        <div style={{fontWeight:700,fontSize:11,color:color,marginBottom:5,textTransform:"uppercase",letterSpacing:"0.06em"}}>🌍 Real-world example</div>
-        <div style={{fontSize:11,color:"#475569",lineHeight:1.65}}>{info.realExample}</div>
+      <div>
+        <div style={{fontWeight:700,fontSize:11,color:color,marginBottom:8,textTransform:"uppercase",letterSpacing:"0.07em",display:"flex",alignItems:"center",gap:5}}>
+          <span>🌍</span> Real-World Example
+        </div>
+        <div style={{fontSize:12,color:"#475569",lineHeight:1.7,background:`${color}08`,borderRadius:10,padding:"10px 12px",border:`1px solid ${color}30`}}>{info.realExample}</div>
       </div>
     </div>
   );
@@ -697,7 +968,6 @@ export default function App() {
   if(!loggedIn) return <LoginScreen onLogin={()=>setLoggedIn(true)}/>;
 
   const openModule=(mod)=>{ setActiveModule(mod.id); setScreen("module"); };
-
   const mod=MODULES.find(m=>m.id===activeModule);
   const SimComponent=activeModule?MODULE_SIMS[activeModule]:null;
 
@@ -706,7 +976,7 @@ export default function App() {
       <div style={{maxWidth:420,width:"100%",textAlign:"center"}}>
         <div style={{fontSize:"2.5rem",marginBottom:12}}>👋</div>
         <h2 style={{color:"#f1f5f9",fontSize:"1.5rem",fontWeight:700,marginBottom:8}}>Welcome! What's your name?</h2>
-        <p style={{color:"#94a3b8",marginBottom:28,fontSize:"0.9rem"}}>Your tutor will personalise your learning journey</p>
+        <p style={{color:"#94a3b8",marginBottom:28,fontSize:"0.9rem"}}>Personalise your learning journey</p>
         <input placeholder="Enter your first name..." value={nameInput} onChange={e=>setNameInput(e.target.value)}
           onKeyDown={e=>e.key==="Enter"&&nameInput.trim()&&(setName(nameInput.trim()),setScreen("hub"))}
           style={{width:"100%",padding:"13px 16px",borderRadius:12,border:"1px solid rgba(255,255,255,0.15)",background:"rgba(255,255,255,0.08)",color:"#e2e8f0",fontSize:"1.1rem",outline:"none",boxSizing:"border-box",marginBottom:12,textAlign:"center"}} autoFocus/>
@@ -730,7 +1000,7 @@ export default function App() {
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(210px,1fr))",gap:14}}>
           {MODULES.map(m=>(
             <div key={m.id} onClick={()=>openModule(m)}
-              style={{background:"#fff",borderRadius:16,padding:"18px 16px",cursor:"pointer",border:`1px solid #e2e8f0`,transition:"all 0.2s",boxShadow:"0 1px 4px rgba(0,0,0,0.06)"}}
+              style={{background:"#fff",borderRadius:16,padding:"18px 16px",cursor:"pointer",border:"1px solid #e2e8f0",transition:"all 0.2s",boxShadow:"0 1px 4px rgba(0,0,0,0.06)"}}
               onMouseEnter={e=>{e.currentTarget.style.transform="translateY(-3px)";e.currentTarget.style.boxShadow=`0 8px 20px ${m.color}30`;}}
               onMouseLeave={e=>{e.currentTarget.style.transform="translateY(0)";e.currentTarget.style.boxShadow="0 1px 4px rgba(0,0,0,0.06)";}}>
               <div style={{width:40,height:40,borderRadius:12,background:`${m.color}18`,border:`1px solid ${m.color}40`,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:800,fontSize:13,color:m.color,marginBottom:10}}>M{m.id}</div>
@@ -744,16 +1014,26 @@ export default function App() {
     </div>
   );
 
-  // ── MODULE SCREEN ──
+  // ── MODULE SCREEN — two-column layout ──
   return (
     <div style={{height:"100vh",display:"flex",flexDirection:"column",fontFamily:"system-ui,sans-serif",background:"#f8fafc"}}>
       <div style={{background:mod?`linear-gradient(135deg,${mod.color}e0,${mod.color}90)`:"linear-gradient(135deg,#0f172a,#1e1b4b)",padding:"10px 16px",display:"flex",alignItems:"center",gap:10,flexShrink:0}}>
         <button onClick={()=>setScreen("hub")} style={{background:"rgba(255,255,255,0.2)",border:"none",color:"#fff",padding:"6px 12px",borderRadius:8,cursor:"pointer",fontWeight:600,fontSize:"0.8rem"}}>← Hub</button>
         {mod&&<div style={{fontWeight:700,color:"#fff",fontSize:"0.95rem"}}>Module {mod.id}: {mod.title}</div>}
       </div>
-      <div style={{flex:1,overflow:"auto",padding:14,display:"flex",flexDirection:"column"}}>
-        {SimComponent&&<SimComponent/>}
-        {activeModule&&<InfoPanel moduleId={activeModule} color={mod?.color||"#6366f1"}/>}
+      <div style={{flex:1,overflow:"hidden",display:"flex"}}>
+        <div style={{flex:1,overflow:"auto",padding:14,display:"flex",flexDirection:"column"}}>
+          {SimComponent&&<SimComponent/>}
+        </div>
+        <div style={{width:290,background:"#fff",borderLeft:"1px solid #e2e8f0",overflow:"auto",padding:18,flexShrink:0}}>
+          {mod&&(
+            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:16,paddingBottom:12,borderBottom:"1px solid #f1f5f9"}}>
+              <div style={{width:10,height:10,borderRadius:"50%",background:mod.color,flexShrink:0}}/>
+              <div style={{fontWeight:700,color:"#0f172a",fontSize:13}}>{mod.title}</div>
+            </div>
+          )}
+          {activeModule&&<InfoPanel moduleId={activeModule} color={mod?.color||"#6366f1"}/>}
+        </div>
       </div>
     </div>
   );
