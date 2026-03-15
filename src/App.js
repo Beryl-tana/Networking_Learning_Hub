@@ -131,7 +131,7 @@ function HandshakeViz({ data }) {
     if (!running) return;
     if (step < data.steps.length - 1) { const t = setTimeout(() => setStep(s => s + 1), 700); return () => clearTimeout(t); }
     else setRunning(false);
-  }, [running, step]);
+  }, [running, step, data.steps.length]);
   return (
     <div style={{ padding: "12px 0" }}>
       <div style={{ fontWeight: 600, fontSize: 13, color: "#64748b", marginBottom: 10 }}>{data.title}</div>
