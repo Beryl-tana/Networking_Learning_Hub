@@ -1,5 +1,5 @@
 {
-  "buildCommand": "NODE_NO_WARNINGS=1 npm run build",
+  "buildCommand": "CI=false NODE_NO_WARNINGS=1 npm run build",
   "outputDirectory": "build",
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api/$1" },
