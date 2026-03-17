@@ -30,6 +30,165 @@ const MODULE_INFO = {
   },
 };
 
+const FAULT_SCENARIOS = {
+  1: [
+    {
+      title: "PC has no network access — nothing loads",
+      symptom: "A user calls: 'My PC can't get online at all. Was fine yesterday.' The network icon shows no connection.",
+      clues: [
+        "Layer 1: Run ping 127.0.0.1 → succeeds (NIC is alive). Check the switch port LED for the PC — it is OFF. No link light.",
+        "Layer 2: Run ipconfig → IP is 169.254.x.x (APIPA). DHCP never ran because there was no physical link to run it on.",
+        "Physical inspection: the RJ45 cable is half-pulled out of the PC's NIC port. No cable seated = no electrical signal = no bits."
+      ],
+      answer: "Physical layer fault (Layer 1). The cable is unseated. Without a physical connection, DHCP can't run, ARP can't run — nothing can. Fix: Reseat or replace the patch cable until the clip clicks. The LED comes on, DHCP auto-assigns an IP, connectivity restored in seconds.",
+      layer: "Physical (Layer 1)",
+      brokenLinkIdx: 0
+    },
+    {
+      title: "Frames reach the switch but the server is unreachable",
+      symptom: "PC can ping the switch and other LAN devices. But the server (93.184.216.34) is completely unreachable — requests just time out.",
+      clues: [
+        "Run: ping 192.168.1.1 (the router) → Request timed out. Yet ipconfig shows correct gateway. Something between router and server is broken.",
+        "Run: traceroute 93.184.216.34 → first hop (the router) is unreachable from the server side. Layer 1/2 between PC and switch is fine.",
+        "Inspect the network diagram — the link between router and server is broken (red). The router has no physical path to forward packets onward."
+      ],
+      answer: "Network layer fault (Layer 3). The link between router and server is severed. PC→Switch is fine (Layer 1/2 OK). Router has nowhere to forward packets destined for 93.184.216.34. Fix: Restore the physical link between router and server, then verify the routing table has the correct route.",
+      layer: "Network (Layer 3)",
+      brokenLinkIdx: 2
+    }
+  ],
+  2: [
+    {
+      title: "PC1 can reach local devices but not the server",
+      symptom: "PC1 can ping PC2 (10.0.0.11) successfully. But all attempts to reach the Server (172.16.0.20) time out completely.",
+      clues: [
+        "Run ipconfig on PC1 → IP: 10.0.0.10/24, Default Gateway: 10.0.0.99. The router's actual IP is 10.0.0.1.",
+        "Run: ping 10.0.0.1 (the actual router) → succeeds! But PC1 is configured to route inter-network traffic via 10.0.0.99 — an IP that doesn't exist.",
+        "PC1 sends packets for 172.16.0.20 to gateway 10.0.0.99. No device claims that IP. ARP gets no reply. Packets dropped silently."
+      ],
+      answer: "Wrong default gateway (Layer 3). PC1's gateway is misconfigured as 10.0.0.99 instead of 10.0.0.1. Same-subnet traffic (PC2) works via direct ARP. Cross-network traffic fails because the gateway is unreachable. Fix: Correct the default gateway to 10.0.0.1 on PC1, or fix the DHCP server to hand out the correct gateway.",
+      layer: "Network (Layer 3)",
+      brokenLinkIdx: 0
+    },
+    {
+      title: "Server is intermittently unreachable from both PCs",
+      symptom: "Both PC1 and PC2 randomly lose connectivity to the server every few minutes. The server itself logs no errors.",
+      clues: [
+        "Run: arp -a on the router → the server's IP (172.16.0.20) shows TWO different MAC addresses, alternating every few minutes.",
+        "A new device was recently connected to Network B and given static IP 172.16.0.20 — the same as the server.",
+        "When the new device ARP-broadcasts, the router updates its table to the new device's MAC. All traffic goes to the wrong host until the server broadcasts again."
+      ],
+      answer: "IP address conflict (Layer 3). Two devices share IP 172.16.0.20. The ARP table oscillates between their MACs causing intermittent packet delivery to the wrong host. Fix: Change the new device to an unused IP. Configure DHCP exclusions for any statically-assigned addresses to prevent future conflicts.",
+      layer: "Network (Layer 3)",
+      brokenLinkIdx: 2
+    }
+  ],
+  3: [
+    {
+      title: "HTTP sites fail but HTTPS sites load fine",
+      symptom: "https://google.com loads perfectly. But the internal intranet at http://intranet.local returns 'Connection refused' every time.",
+      clues: [
+        "Run: telnet intranet.local 443 → connects. Run: telnet intranet.local 80 → Connection refused immediately.",
+        "Review firewall rules → TCP port 443 (HTTPS): ALLOW. TCP port 80 (HTTP): BLOCK.",
+        "The firewall between client and server is dropping all TCP port 80 traffic. Port 443 passes freely."
+      ],
+      answer: "Firewall blocking TCP port 80 (Layer 4 — Transport). The firewall has an explicit BLOCK rule for HTTP. The intranet only serves HTTP on port 80. Fix: Add a firewall rule to ALLOW TCP port 80, or reconfigure the intranet server to use HTTPS on port 443.",
+      layer: "Transport (Layer 4) — Firewall",
+      brokenLinkIdx: 1
+    },
+    {
+      title: "Browser spins forever — no error, no response",
+      symptom: "Client tries to open a connection to the web server. The browser just spins indefinitely. No error message, no timeout for 2 minutes.",
+      clues: [
+        "Run: ping 93.184.216.34 → replies successfully. ICMP is allowed, network path exists.",
+        "Packet capture: TCP SYN leaves the client, passes the firewall, arrives at the server — but zero SYN-ACK ever returns.",
+        "Check the server's host firewall: rule 'DROP all inbound TCP' was added by an admin last week with no exceptions."
+      ],
+      answer: "Server host firewall dropping inbound TCP (Layer 4). Ping works (ICMP allowed) so the network path is fine. But TCP's 3-way handshake can never complete — the server silently drops the SYN. The client waits indefinitely for a SYN-ACK. Fix: Add an inbound host firewall rule: ALLOW TCP [required port] inbound on the server.",
+      layer: "Transport (Layer 4) — Host Firewall",
+      brokenLinkIdx: 1
+    }
+  ],
+  4: [
+    {
+      title: "Can ping IPs directly but domain names don't resolve",
+      symptom: "ping 8.8.8.8 works fine. But ping google.com returns 'could not find host google.com'. All web browsing is broken.",
+      clues: [
+        "Run: nslookup google.com → 'DNS request timed out'. The DNS server is not responding to queries.",
+        "Check router DNS config → DNS server is set to 192.168.1.50, a device removed from the network last week.",
+        "Run: nslookup google.com 8.8.8.8 → returns 142.250.4.100 immediately. Internet works, only the configured DNS is broken."
+      ],
+      answer: "DNS server unreachable (Application Layer — DNS). The configured DNS server (192.168.1.50) no longer exists on the network. Raw IP connectivity is fine but name resolution fails completely. Fix: Update the DNS setting to a working resolver — 8.8.8.8, 1.1.1.1, or the router's own IP if it forwards DNS.",
+      layer: "Application (Layer 5 — DNS)",
+      brokenLinkIdx: 1
+    },
+    {
+      title: "New laptop gets 169.254.x.x and can't access anything",
+      symptom: "A new laptop joins the office WiFi. It shows IP 169.254.x.x and cannot reach any resource. Every other device works perfectly.",
+      clues: [
+        "Run: ipconfig /release then /renew → DHCP Discover is broadcast but times out every single attempt. No offer arrives.",
+        "Other devices have valid 192.168.1.x addresses and full connectivity — the network itself is fine.",
+        "Check router DHCP status → Scope 192.168.1.2–254 (253 addresses). All leases show ACTIVE. Pool is 100% exhausted."
+      ],
+      answer: "DHCP pool exhausted (Application Layer — DHCP). All available IP addresses are leased. Many belong to laptops that left the office but still hold 24-hour leases. New device gets no offer and falls back to APIPA (169.254.x.x). Fix: Reduce lease time to 8 hours so addresses reclaim faster, expand the subnet, or add a DHCP exclusion cleanup for stale leases.",
+      layer: "Application (Layer 5 — DHCP)",
+      brokenLinkIdx: 0
+    }
+  ],
+  5: [
+    {
+      title: "WiFi drops for ~10 seconds every few minutes",
+      symptom: "The whole office WiFi disconnects briefly at irregular intervals. Wired ethernet connections are completely unaffected.",
+      clues: [
+        "All office devices are on 2.4GHz. The kitchen 5 metres away has a commercial microwave used frequently through the day.",
+        "WiFi analyser during a drop: signal strength unchanged, but signal-to-noise ratio (SNR) spikes sharply during microwave cooking cycles.",
+        "2.4GHz WiFi and microwave ovens both operate at 2.4–2.5 GHz. Microwave shielding is imperfect and bleeds RF energy onto the band."
+      ],
+      answer: "RF interference from microwave oven (Physical Layer — Wireless). Microwaves operate at 2.45 GHz and emit broadband RF interference that overwhelms 2.4GHz WiFi signals. 5GHz is completely immune. Fix: Move devices to 5GHz. For 2.4GHz-only devices, switch to channel 1 or 11 to reduce overlap with the interference peak.",
+      layer: "Physical (Layer 1 — RF/Wireless)",
+      brokenLinkIdx: 1
+    },
+    {
+      title: "Great signal strength but internet is nearly unusable",
+      symptom: "Laptop is 1 metre from the router showing 5 bars, but pages take 20+ seconds to load and video calls drop constantly.",
+      clues: [
+        "WiFi scan (inSSIDer): 9 neighbouring networks visible. 7 of them are on 2.4GHz channel 6 — same channel as your router.",
+        "Switch the laptop to 5GHz manually → speeds jump from ~2 Mbps to 180 Mbps instantly on the same router.",
+        "2.4GHz channel 6 is saturated with competing traffic. All devices on the same channel must share airtime and retry collisions."
+      ],
+      answer: "2.4GHz channel congestion (Physical Layer — Wireless). Strong signal means nothing if the channel is saturated. Every nearby network on the same channel competes for airtime. Fix: Switch to 5GHz (far less congested). If 2.4GHz is required, change to channel 1 or 11 (non-overlapping). WiFi 6 (802.11ax) handles congestion far better with OFDMA.",
+      layer: "Physical (Layer 1 — Wireless)",
+      brokenLinkIdx: 1
+    }
+  ],
+  6: [
+    {
+      title: "'I can't get online at all' — helpdesk call",
+      symptom: "First call of the day: 'My PC was working fine yesterday, now nothing works. No websites, no shared drive, nothing at all.'",
+      clues: [
+        "Layer 1: ping 127.0.0.1 → succeeds (NIC alive). Look at the switch port LED for the PC → LED is completely OFF. No physical link.",
+        "Layer 2: ipconfig → IP is 169.254.43.21 (APIPA). DHCP never ran because there was no physical layer to run it on.",
+        "Physical check: ethernet cable behind the user's desk was knocked loose when they moved their monitor this morning. Cable is half-unplugged."
+      ],
+      answer: "Physical layer failure (Layer 1). Dislodged cable — no electrical signal on the wire, switch and NIC both report no link. Without Layer 1, every other layer fails. Fix: Reseat the cable firmly until the clip clicks. Switch LED lights up, DHCP runs automatically, IP assigned within seconds. Key lesson: always start at the bottom (Physical) and work up.",
+      layer: "Physical (Layer 1)",
+      brokenLinkIdx: 0
+    },
+    {
+      title: "Some websites load — internal systems all fail",
+      symptom: "User can access google.com and youtube.com. But the company intranet, ticketing system, and file server all return 'Server not found'.",
+      clues: [
+        "Run: ping intranet.company.com → 'could not find host'. Run: ping 10.5.0.1 (intranet IP directly) → replies! Server is up, name resolution is failing.",
+        "Run: nslookup intranet.company.com → query goes to 8.8.8.8 (Google DNS). Response: NXDOMAIN — Google has no record for this internal name.",
+        "Check PC DNS: primary DNS is 8.8.8.8. The internal DNS server at 10.0.0.2 holds all company domain records but is never being queried."
+      ],
+      answer: "DNS misconfiguration (Application Layer). PC uses public DNS (8.8.8.8) which has no knowledge of internal domain names. Public internet resolves fine. Internal names fail. Fix: Set primary DNS to the internal server (10.0.0.2). The internal DNS server handles company domains and conditionally forwards public queries to 8.8.8.8.",
+      layer: "Application (Layer 5 — DNS)",
+      brokenLinkIdx: 2
+    }
+  ]
+};
+
 const MODULES = [
   { id:1, title:"Intro to Networking", color:"#6366f1", bg:"#eef2ff", desc:"Layers, devices & cables" },
   { id:2, title:"Network Layer", color:"#0ea5e9", bg:"#e0f2fe", desc:"IP addressing & routing" },
@@ -102,7 +261,7 @@ function usePacketAnim(devices, packets, running, speed) {
   return positions;
 }
 
-function NetSimCanvas({ devices: initialDevices, links: initialLinks, packets, label, desc, color="#6366f1" }) {
+function NetSimCanvas({ devices: initialDevices, links: initialLinks, packets, label, desc, color="#6366f1", faultScenarios=[] }) {
   const [running, setRunning] = useState(false);
   const [paused, setPaused] = useState(false);
   const [speed, setSpeed] = useState(1);
@@ -116,6 +275,9 @@ function NetSimCanvas({ devices: initialDevices, links: initialLinks, packets, l
   const [troubleshootMode, setTroubleshootMode] = useState(false);
   const [brokenLink, setBrokenLink] = useState(null);
   const [fixedLinks, setFixedLinks] = useState([]);
+  const [faultScenarioIdx, setFaultScenarioIdx] = useState(0);
+  const [revealedClues, setRevealedClues] = useState([]);
+  const [showAnswer, setShowAnswer] = useState(false);
   const dragRef = useRef(null);
   const didDragRef = useRef(false);
   const svgRef = useRef(null);
@@ -162,9 +324,16 @@ function NetSimCanvas({ devices: initialDevices, links: initialLinks, packets, l
   };
 
   const activateTroubleshoot = () => {
-    if (initialLinks.length === 0) return;
-    setBrokenLink(Math.floor(Math.random() * initialLinks.length));
+    if (faultScenarios.length > 0) {
+      const idx = Math.floor(Math.random() * faultScenarios.length);
+      setFaultScenarioIdx(idx);
+      setBrokenLink(faultScenarios[idx].brokenLinkIdx);
+    } else if (initialLinks.length > 0) {
+      setBrokenLink(Math.floor(Math.random() * initialLinks.length));
+    } else { return; }
     setFixedLinks([]);
+    setRevealedClues([]);
+    setShowAnswer(false);
     setTroubleshootMode(true);
     setRunning(false);
   };
@@ -188,15 +357,15 @@ function NetSimCanvas({ devices: initialDevices, links: initialLinks, packets, l
         ))}
         <div style={{width:1,height:18,background:"rgba(255,255,255,0.15)",margin:"0 2px"}}/>
         <button
-          onClick={troubleshootMode ? ()=>{setTroubleshootMode(false);setBrokenLink(null);setFixedLinks([]);} : activateTroubleshoot}
+          onClick={troubleshootMode ? ()=>{setTroubleshootMode(false);setBrokenLink(null);setFixedLinks([]);setRevealedClues([]);setShowAnswer(false);} : activateTroubleshoot}
           style={{height:24,padding:"0 9px",borderRadius:6,border:"none",background:troubleshootMode?"#f59e0b":"#7c3aed",color:"#fff",cursor:"pointer",fontSize:10,fontWeight:600}}>
           {troubleshootMode ? "Exit Fault" : "🔧 Fault Mode"}
         </button>
         <span style={{color:"#475569",fontSize:9,marginLeft:"auto"}}>Drag devices · Click to inspect</span>
       </div>
       {troubleshootMode && (
-        <div style={{background:"rgba(124,58,237,0.12)",borderBottom:"1px solid rgba(124,58,237,0.2)",padding:"5px 14px",fontSize:10,color:"#c4b5fd",display:"flex",alignItems:"center",gap:8}}>
-          <span>🔧 <b>Fault injected!</b> A link is broken. Click the red ✕ link to fix it.</span>
+        <div style={{background:"rgba(124,58,237,0.12)",borderBottom:"1px solid rgba(124,58,237,0.2)",padding:"4px 14px",fontSize:10,color:"#c4b5fd",display:"flex",alignItems:"center",gap:8}}>
+          <span>🔧 <b>Fault Mode active.</b> Investigate using the panel → then click the red ✕ to fix it.</span>
           {fixedLinks.length > 0 && <span style={{color:"#86efac",fontWeight:700}}>✅ Network restored!</span>}
         </div>
       )}
@@ -254,9 +423,59 @@ function NetSimCanvas({ devices: initialDevices, links: initialLinks, packets, l
             </div>
           )}
         </div>
-        <div style={{width:155,background:"#fff",borderLeft:"1px solid #e2e8f0",padding:10,overflowY:"auto",fontSize:11,flexShrink:0}}>
-          {selected ? (
-            <div>
+        <div style={{width: troubleshootMode && faultScenarios.length > 0 ? 210 : 155, background:"#fff",borderLeft:"1px solid #e2e8f0",overflowY:"auto",fontSize:11,flexShrink:0}}>
+          {troubleshootMode && faultScenarios.length > 0 ? (() => {
+            const sc = faultScenarios[faultScenarioIdx];
+            if (!sc) return null;
+            return (
+              <div style={{padding:"8px 9px",height:"100%",boxSizing:"border-box",display:"flex",flexDirection:"column",gap:6}}>
+                <div style={{background:"#fef2f2",border:"1px solid #fecaca",borderRadius:7,padding:"6px 8px"}}>
+                  <div style={{fontSize:8,fontWeight:700,color:"#dc2626",textTransform:"uppercase",marginBottom:2}}>🔴 Fault Report</div>
+                  <div style={{fontSize:10,fontWeight:700,color:"#1e293b",lineHeight:1.3,marginBottom:4}}>{sc.title}</div>
+                  <div style={{fontSize:9,color:"#64748b",lineHeight:1.5}}>{sc.symptom}</div>
+                </div>
+                <div style={{fontSize:8,fontWeight:700,color:"#94a3b8",textTransform:"uppercase",letterSpacing:"0.07em"}}>🔍 Investigate</div>
+                {sc.clues.map((clue,i)=>(
+                  <div key={i}>
+                    {revealedClues.includes(i) ? (
+                      <div style={{background:"#f0f9ff",border:"1px solid #bae6fd",borderRadius:6,padding:"5px 7px",fontSize:9,color:"#0369a1",lineHeight:1.5}}>
+                        <b>Clue {i+1}:</b> {clue}
+                      </div>
+                    ) : (
+                      <button onClick={()=>setRevealedClues(prev=>[...prev,i])}
+                        style={{width:"100%",padding:"4px 7px",borderRadius:6,border:"1px solid #e2e8f0",background:"#f8fafc",color:"#475569",cursor:"pointer",fontSize:9,textAlign:"left",fontWeight:600}}>
+                        🔍 Reveal Clue {i+1}
+                      </button>
+                    )}
+                  </div>
+                ))}
+                <div style={{marginTop:"auto",display:"flex",flexDirection:"column",gap:4}}>
+                  {!showAnswer ? (
+                    <button onClick={()=>setShowAnswer(true)}
+                      style={{width:"100%",padding:"5px 0",borderRadius:6,border:"none",background:"#7c3aed",color:"#fff",fontWeight:700,fontSize:9,cursor:"pointer"}}>
+                      Reveal Answer
+                    </button>
+                  ) : (
+                    <div style={{background:"#ecfdf5",border:"1px solid #a7f3d0",borderRadius:7,padding:"6px 8px"}}>
+                      <div style={{fontSize:8,fontWeight:700,color:"#065f46",marginBottom:3}}>✅ Root Cause & Fix</div>
+                      <div style={{fontSize:9,color:"#064e3b",lineHeight:1.5,marginBottom:4}}>{sc.answer}</div>
+                      <div style={{fontSize:8,color:"#10b981",fontWeight:700}}>{sc.layer}</div>
+                    </div>
+                  )}
+                  {fixedLinks.length>0&&<div style={{background:"#ecfdf5",border:"1px solid #86efac",borderRadius:6,padding:"4px 7px",fontSize:9,color:"#166534",fontWeight:700,textAlign:"center"}}>✅ Network restored!</div>}
+                  <button onClick={()=>{
+                    const next=(faultScenarioIdx+1)%faultScenarios.length;
+                    setFaultScenarioIdx(next);
+                    setBrokenLink(faultScenarios[next].brokenLinkIdx);
+                    setFixedLinks([]);setRevealedClues([]);setShowAnswer(false);setRunning(false);
+                  }} style={{width:"100%",padding:"4px 0",borderRadius:6,border:"1px solid #e2e8f0",background:"transparent",color:"#64748b",fontSize:9,cursor:"pointer",fontWeight:600}}>
+                    Next Scenario ({faultScenarioIdx+1}/{faultScenarios.length})
+                  </button>
+                </div>
+              </div>
+            );
+          })() : selected ? (
+            <div style={{padding:10}}>
               <button onClick={()=>setSelected(null)} style={{fontSize:10,color:"#94a3b8",background:"none",border:"none",cursor:"pointer",marginBottom:6,padding:0}}>← back</button>
               <div style={{fontWeight:700,color:selected.color||color,marginBottom:7,fontSize:12}}>{selected.label}</div>
               {[["Type",selected.type],["IP",selected.ip||"N/A"],["Role",selected.role||"—"]].map(([k,v])=>(
@@ -268,7 +487,7 @@ function NetSimCanvas({ devices: initialDevices, links: initialLinks, packets, l
               {selected.info && <div style={{marginTop:6,background:`${selected.color||color}12`,borderRadius:6,padding:"5px 7px",color:"#475569",lineHeight:1.5,fontSize:10}}>{selected.info}</div>}
             </div>
           ) : (
-            <div>
+            <div style={{padding:10}}>
               <div style={{fontWeight:700,color:"#0f172a",marginBottom:5,fontSize:12}}>{label}</div>
               <div style={{color:"#64748b",lineHeight:1.5,marginBottom:8,fontSize:10}}>{desc}</div>
               <div style={{fontSize:9,fontWeight:700,color:"#94a3b8",textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:5}}>Packets</div>
@@ -314,7 +533,7 @@ function Mod1Sim() {
   return (
     <div style={{display:"flex",flexDirection:"column",gap:12,height:"100%"}}>
       <div style={{height:340,flexShrink:0}}>
-        <NetSimCanvas devices={devices} links={links} packets={packets} label="Network Devices" desc="See how data flows through a switch and router." color="#6366f1"/>
+        <NetSimCanvas devices={devices} links={links} packets={packets} label="Network Devices" desc="See how data flows through a switch and router." color="#6366f1" faultScenarios={FAULT_SCENARIOS[1]}/>
       </div>
       <div style={{flex:1,display:"flex",gap:10,minHeight:0}}>
         <div style={{flex:1,background:"#fff",borderRadius:12,border:"1px solid #e2e8f0",padding:12,overflowY:"auto"}}>
@@ -420,7 +639,7 @@ function Mod2Sim() {
   return (
     <div style={{display:"flex",flexDirection:"column",gap:10,height:"100%"}}>
       <div style={{height:340,flexShrink:0}}>
-        <NetSimCanvas devices={devices} links={links} packets={packets} label="Routing Between Networks" desc="Watch packets route between two IP networks via a router." color="#0ea5e9"/>
+        <NetSimCanvas devices={devices} links={links} packets={packets} label="Routing Between Networks" desc="Watch packets route between two IP networks via a router." color="#0ea5e9" faultScenarios={FAULT_SCENARIOS[2]}/>
       </div>
       <div style={{flex:1,display:"flex",gap:10,minHeight:0}}>
         <div style={{flex:1,background:"#fff",borderRadius:12,border:"1px solid #e2e8f0",padding:12,overflowY:"auto"}}>
@@ -549,7 +768,7 @@ function Mod3Sim() {
   return (
     <div style={{display:"flex",flexDirection:"column",gap:10,height:"100%"}}>
       <div style={{height:320,flexShrink:0}}>
-        <NetSimCanvas devices={devices} links={links} packets={packets} label="TCP Connection Flow" desc="Watch a full TCP handshake then data transfer through a firewall." color="#10b981"/>
+        <NetSimCanvas devices={devices} links={links} packets={packets} label="TCP Connection Flow" desc="Watch a full TCP handshake then data transfer through a firewall." color="#10b981" faultScenarios={FAULT_SCENARIOS[3]}/>
       </div>
       <div style={{flex:1,display:"flex",gap:10,minHeight:0}}>
         <div style={{flex:1.2,background:"#fff",borderRadius:12,border:"1px solid #e2e8f0",padding:12,overflowY:"auto"}}>
@@ -656,7 +875,7 @@ function Mod4Sim() {
   return (
     <div style={{display:"flex",flexDirection:"column",gap:10,height:"100%"}}>
       <div style={{height:340,flexShrink:0}}>
-        <NetSimCanvas devices={devices} links={links} packets={packets} label="DNS + DHCP + NAT" desc="Watch a full web request — DNS lookup, NAT translation, HTTP response." color="#f59e0b"/>
+        <NetSimCanvas devices={devices} links={links} packets={packets} label="DNS + DHCP + NAT" desc="Watch a full web request — DNS lookup, NAT translation, HTTP response." color="#f59e0b" faultScenarios={FAULT_SCENARIOS[4]}/>
       </div>
       <div style={{flex:1,display:"flex",gap:10,minHeight:0}}>
         <div style={{flex:1.2,background:"#fff",borderRadius:12,border:"1px solid #e2e8f0",padding:12,overflowY:"auto"}}>
@@ -743,7 +962,7 @@ function Mod5Sim() {
   return (
     <div style={{display:"flex",flexDirection:"column",gap:10,height:"100%"}}>
       <div style={{height:340,flexShrink:0}}>
-        <NetSimCanvas devices={devices} links={links} packets={packets} label="Home Network to Internet" desc="See how WiFi devices connect through your router and ISP to the internet." color="#ec4899"/>
+        <NetSimCanvas devices={devices} links={links} packets={packets} label="Home Network to Internet" desc="See how WiFi devices connect through your router and ISP to the internet." color="#ec4899" faultScenarios={FAULT_SCENARIOS[5]}/>
       </div>
       <div style={{flex:1,display:"flex",gap:10,minHeight:0}}>
         <div style={{flex:1,background:"#fff",borderRadius:12,border:"1px solid #e2e8f0",padding:12,overflowY:"auto"}}>
@@ -815,7 +1034,7 @@ function Mod6Sim() {
   return (
     <div style={{display:"flex",flexDirection:"column",gap:10,height:"100%"}}>
       <div style={{height:340,flexShrink:0}}>
-        <NetSimCanvas devices={devices} links={links} packets={packets} label="Network Fault Scenario" desc="A PC has an APIPA address (169.254.x.x). Diagnose the fault bottom-up." color="#ef4444"/>
+        <NetSimCanvas devices={devices} links={links} packets={packets} label="Network Fault Scenario" desc="A PC has an APIPA address (169.254.x.x). Diagnose the fault bottom-up." color="#ef4444" faultScenarios={FAULT_SCENARIOS[6]}/>
       </div>
       <div style={{flex:1,display:"flex",gap:10,minHeight:0}}>
         <div style={{flex:1.1,background:"#fff",borderRadius:12,border:"1px solid #e2e8f0",padding:12,overflowY:"auto"}}>
