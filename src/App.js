@@ -42,6 +42,7 @@ const FAULT_SCENARIOS = {
       ],
       answer: "Physical layer fault (Layer 1). The cable is unseated. Without a physical connection, DHCP can't run, ARP can't run — nothing can. Fix: Reseat or replace the patch cable until the clip clicks. The LED comes on, DHCP auto-assigns an IP, connectivity restored in seconds.",
       layer: "Physical (Layer 1)",
+      keywords: ["cable", "physical", "layer 1", "unplugged", "led", "apipa"],
       brokenLinkIdx: 0
     },
     {
@@ -54,6 +55,7 @@ const FAULT_SCENARIOS = {
       ],
       answer: "Network layer fault (Layer 3). The link between router and server is severed. PC→Switch is fine (Layer 1/2 OK). Router has nowhere to forward packets destined for 93.184.216.34. Fix: Restore the physical link between router and server, then verify the routing table has the correct route.",
       layer: "Network (Layer 3)",
+      keywords: ["layer 3", "routing", "route", "network", "link", "router"],
       brokenLinkIdx: 2
     }
   ],
@@ -68,6 +70,7 @@ const FAULT_SCENARIOS = {
       ],
       answer: "Wrong default gateway (Layer 3). PC1's gateway is misconfigured as 10.0.0.99 instead of 10.0.0.1. Same-subnet traffic (PC2) works via direct ARP. Cross-network traffic fails because the gateway is unreachable. Fix: Correct the default gateway to 10.0.0.1 on PC1, or fix the DHCP server to hand out the correct gateway.",
       layer: "Network (Layer 3)",
+      keywords: ["gateway", "default gateway", "misconfigured", "wrong", "10.0.0.1"],
       brokenLinkIdx: 0
     },
     {
@@ -80,6 +83,7 @@ const FAULT_SCENARIOS = {
       ],
       answer: "IP address conflict (Layer 3). Two devices share IP 172.16.0.20. The ARP table oscillates between their MACs causing intermittent packet delivery to the wrong host. Fix: Change the new device to an unused IP. Configure DHCP exclusions for any statically-assigned addresses to prevent future conflicts.",
       layer: "Network (Layer 3)",
+      keywords: ["conflict", "duplicate", "same ip", "arp", "ip address"],
       brokenLinkIdx: 2
     }
   ],
@@ -94,6 +98,7 @@ const FAULT_SCENARIOS = {
       ],
       answer: "Firewall blocking TCP port 80 (Layer 4 — Transport). The firewall has an explicit BLOCK rule for HTTP. The intranet only serves HTTP on port 80. Fix: Add a firewall rule to ALLOW TCP port 80, or reconfigure the intranet server to use HTTPS on port 443.",
       layer: "Transport (Layer 4) — Firewall",
+      keywords: ["port 80", "http", "firewall", "blocked", "rule", "allow"],
       brokenLinkIdx: 1
     },
     {
@@ -106,6 +111,7 @@ const FAULT_SCENARIOS = {
       ],
       answer: "Server host firewall dropping inbound TCP (Layer 4). Ping works (ICMP allowed) so the network path is fine. But TCP's 3-way handshake can never complete — the server silently drops the SYN. The client waits indefinitely for a SYN-ACK. Fix: Add an inbound host firewall rule: ALLOW TCP [required port] inbound on the server.",
       layer: "Transport (Layer 4) — Host Firewall",
+      keywords: ["firewall", "server", "inbound", "tcp", "syn", "drop"],
       brokenLinkIdx: 1
     }
   ],
@@ -120,6 +126,7 @@ const FAULT_SCENARIOS = {
       ],
       answer: "DNS server unreachable (Application Layer — DNS). The configured DNS server (192.168.1.50) no longer exists on the network. Raw IP connectivity is fine but name resolution fails completely. Fix: Update the DNS setting to a working resolver — 8.8.8.8, 1.1.1.1, or the router's own IP if it forwards DNS.",
       layer: "Application (Layer 5 — DNS)",
+      keywords: ["dns", "resolver", "name resolution", "nameserver", "domain"],
       brokenLinkIdx: 1
     },
     {
@@ -132,6 +139,7 @@ const FAULT_SCENARIOS = {
       ],
       answer: "DHCP pool exhausted (Application Layer — DHCP). All available IP addresses are leased. Many belong to laptops that left the office but still hold 24-hour leases. New device gets no offer and falls back to APIPA (169.254.x.x). Fix: Reduce lease time to 8 hours so addresses reclaim faster, expand the subnet, or add a DHCP exclusion cleanup for stale leases.",
       layer: "Application (Layer 5 — DHCP)",
+      keywords: ["dhcp", "pool", "exhausted", "lease", "apipa", "addresses"],
       brokenLinkIdx: 0
     }
   ],
@@ -146,6 +154,7 @@ const FAULT_SCENARIOS = {
       ],
       answer: "RF interference from microwave oven (Physical Layer — Wireless). Microwaves operate at 2.45 GHz and emit broadband RF interference that overwhelms 2.4GHz WiFi signals. 5GHz is completely immune. Fix: Move devices to 5GHz. For 2.4GHz-only devices, switch to channel 1 or 11 to reduce overlap with the interference peak.",
       layer: "Physical (Layer 1 — RF/Wireless)",
+      keywords: ["microwave", "interference", "2.4", "rf", "frequency", "5ghz"],
       brokenLinkIdx: 1
     },
     {
@@ -158,6 +167,7 @@ const FAULT_SCENARIOS = {
       ],
       answer: "2.4GHz channel congestion (Physical Layer — Wireless). Strong signal means nothing if the channel is saturated. Every nearby network on the same channel competes for airtime. Fix: Switch to 5GHz (far less congested). If 2.4GHz is required, change to channel 1 or 11 (non-overlapping). WiFi 6 (802.11ax) handles congestion far better with OFDMA.",
       layer: "Physical (Layer 1 — Wireless)",
+      keywords: ["channel", "congestion", "2.4ghz", "5ghz", "overlap", "saturated"],
       brokenLinkIdx: 1
     }
   ],
@@ -172,6 +182,7 @@ const FAULT_SCENARIOS = {
       ],
       answer: "Physical layer failure (Layer 1). Dislodged cable — no electrical signal on the wire, switch and NIC both report no link. Without Layer 1, every other layer fails. Fix: Reseat the cable firmly until the clip clicks. Switch LED lights up, DHCP runs automatically, IP assigned within seconds. Key lesson: always start at the bottom (Physical) and work up.",
       layer: "Physical (Layer 1)",
+      keywords: ["cable", "physical", "layer 1", "unplugged", "led", "apipa"],
       brokenLinkIdx: 0
     },
     {
@@ -184,6 +195,7 @@ const FAULT_SCENARIOS = {
       ],
       answer: "DNS misconfiguration (Application Layer). PC uses public DNS (8.8.8.8) which has no knowledge of internal domain names. Public internet resolves fine. Internal names fail. Fix: Set primary DNS to the internal server (10.0.0.2). The internal DNS server handles company domains and conditionally forwards public queries to 8.8.8.8.",
       layer: "Application (Layer 5 — DNS)",
+      keywords: ["dns", "internal", "public", "name resolution", "8.8.8.8", "domain"],
       brokenLinkIdx: 2
     }
   ]
@@ -278,6 +290,10 @@ function NetSimCanvas({ devices: initialDevices, links: initialLinks, packets, l
   const [faultScenarioIdx, setFaultScenarioIdx] = useState(0);
   const [revealedClues, setRevealedClues] = useState([]);
   const [showAnswer, setShowAnswer] = useState(false);
+  const [diagnosis, setDiagnosis] = useState("");
+  const [submitted, setSubmitted] = useState(false);
+  const [isCorrect, setIsCorrect] = useState(false);
+  const [moduleScore, setModuleScore] = useState({correct:0, total:0});
   const dragRef = useRef(null);
   const didDragRef = useRef(false);
   const svgRef = useRef(null);
@@ -334,8 +350,24 @@ function NetSimCanvas({ devices: initialDevices, links: initialLinks, packets, l
     setFixedLinks([]);
     setRevealedClues([]);
     setShowAnswer(false);
+    setDiagnosis("");
+    setSubmitted(false);
+    setIsCorrect(false);
     setTroubleshootMode(true);
     setRunning(false);
+  };
+
+  const submitDiagnosis = () => {
+    if (!diagnosis.trim()) return;
+    const sc = faultScenarios[faultScenarioIdx];
+    if (!sc) return;
+    const lower = diagnosis.toLowerCase();
+    const matched = (sc.keywords||[]).filter(k => lower.includes(k.toLowerCase()));
+    const correct = matched.length >= 2;
+    setIsCorrect(correct);
+    setSubmitted(true);
+    setShowAnswer(true);
+    setModuleScore(prev => ({correct: prev.correct+(correct?1:0), total: prev.total+1}));
   };
 
   const positions = usePacketAnim(devices, packets, running && !paused, speed);
@@ -357,7 +389,7 @@ function NetSimCanvas({ devices: initialDevices, links: initialLinks, packets, l
         ))}
         <div style={{width:1,height:18,background:"rgba(255,255,255,0.15)",margin:"0 2px"}}/>
         <button
-          onClick={troubleshootMode ? ()=>{setTroubleshootMode(false);setBrokenLink(null);setFixedLinks([]);setRevealedClues([]);setShowAnswer(false);} : activateTroubleshoot}
+          onClick={troubleshootMode ? ()=>{setTroubleshootMode(false);setBrokenLink(null);setFixedLinks([]);setRevealedClues([]);setShowAnswer(false);setDiagnosis("");setSubmitted(false);setIsCorrect(false);setModuleScore({correct:0,total:0});} : activateTroubleshoot}
           style={{height:24,padding:"0 9px",borderRadius:6,border:"none",background:troubleshootMode?"#f59e0b":"#7c3aed",color:"#fff",cursor:"pointer",fontSize:10,fontWeight:600}}>
           {troubleshootMode ? "Exit Fault" : "🔧 Fault Mode"}
         </button>
@@ -430,13 +462,16 @@ function NetSimCanvas({ devices: initialDevices, links: initialLinks, packets, l
             const sc = faultScenarios[faultScenarioIdx];
             if (!sc) return null;
             return (
-              <div style={{padding:"8px 9px",height:"100%",boxSizing:"border-box",display:"flex",flexDirection:"column",gap:6}}>
+              <div style={{padding:"8px 9px",height:"100%",boxSizing:"border-box",display:"flex",flexDirection:"column",gap:6,overflowY:"auto"}}>
+                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+                  <div style={{fontSize:8,fontWeight:700,color:"#dc2626",textTransform:"uppercase"}}>🔴 Fault Report</div>
+                  {moduleScore.total>0&&<div style={{fontSize:9,fontWeight:700,color:"#6366f1",background:"#eef2ff",borderRadius:5,padding:"1px 6px"}}>Score: {moduleScore.correct}/{moduleScore.total}</div>}
+                </div>
                 <div style={{background:"#fef2f2",border:"1px solid #fecaca",borderRadius:7,padding:"6px 8px"}}>
-                  <div style={{fontSize:8,fontWeight:700,color:"#dc2626",textTransform:"uppercase",marginBottom:2}}>🔴 Fault Report</div>
-                  <div style={{fontSize:10,fontWeight:700,color:"#1e293b",lineHeight:1.3,marginBottom:4}}>{sc.title}</div>
+                  <div style={{fontSize:10,fontWeight:700,color:"#1e293b",lineHeight:1.3,marginBottom:3}}>{sc.title}</div>
                   <div style={{fontSize:9,color:"#64748b",lineHeight:1.5}}>{sc.symptom}</div>
                 </div>
-                <div style={{fontSize:8,fontWeight:700,color:"#94a3b8",textTransform:"uppercase",letterSpacing:"0.07em"}}>🔍 Investigate</div>
+                <div style={{fontSize:8,fontWeight:700,color:"#94a3b8",textTransform:"uppercase",letterSpacing:"0.07em"}}>🔍 Clues (optional hints)</div>
                 {sc.clues.map((clue,i)=>(
                   <div key={i}>
                     {revealedClues.includes(i) ? (
@@ -444,36 +479,49 @@ function NetSimCanvas({ devices: initialDevices, links: initialLinks, packets, l
                         <b>Clue {i+1}:</b> {clue}
                       </div>
                     ) : (
-                      <button onClick={()=>setRevealedClues(prev=>[...prev,i])}
-                        style={{width:"100%",padding:"4px 7px",borderRadius:6,border:"1px solid #e2e8f0",background:"#f8fafc",color:"#475569",cursor:"pointer",fontSize:9,textAlign:"left",fontWeight:600}}>
+                      <button onClick={()=>!submitted&&setRevealedClues(prev=>[...prev,i])} disabled={submitted}
+                        style={{width:"100%",padding:"4px 7px",borderRadius:6,border:"1px solid #e2e8f0",background:"#f8fafc",color:submitted?"#c4c4c4":"#475569",cursor:submitted?"default":"pointer",fontSize:9,textAlign:"left",fontWeight:600}}>
                         🔍 Reveal Clue {i+1}
                       </button>
                     )}
                   </div>
                 ))}
-                <div style={{marginTop:"auto",display:"flex",flexDirection:"column",gap:4}}>
-                  {!showAnswer ? (
-                    <button onClick={()=>setShowAnswer(true)}
-                      style={{width:"100%",padding:"5px 0",borderRadius:6,border:"none",background:"#7c3aed",color:"#fff",fontWeight:700,fontSize:9,cursor:"pointer"}}>
-                      Reveal Answer
+                {!submitted ? (
+                  <>
+                    <div style={{fontSize:8,fontWeight:700,color:"#94a3b8",textTransform:"uppercase",letterSpacing:"0.07em"}}>💬 Your Diagnosis</div>
+                    <textarea value={diagnosis} onChange={e=>setDiagnosis(e.target.value)}
+                      placeholder="What is the root cause? How would you fix it?"
+                      rows={4}
+                      style={{width:"100%",padding:"6px 8px",borderRadius:6,border:"1px solid #cbd5e1",fontSize:9,resize:"none",fontFamily:"inherit",outline:"none",boxSizing:"border-box",lineHeight:1.5,color:"#334155"}}/>
+                    <button onClick={submitDiagnosis} disabled={!diagnosis.trim()}
+                      style={{width:"100%",padding:"7px 0",borderRadius:6,border:"none",background:diagnosis.trim()?"#6366f1":"#e2e8f0",color:diagnosis.trim()?"#fff":"#94a3b8",fontWeight:700,fontSize:10,cursor:diagnosis.trim()?"pointer":"default"}}>
+                      Submit Answer
                     </button>
-                  ) : (
-                    <div style={{background:"#ecfdf5",border:"1px solid #a7f3d0",borderRadius:7,padding:"6px 8px"}}>
-                      <div style={{fontSize:8,fontWeight:700,color:"#065f46",marginBottom:3}}>✅ Root Cause & Fix</div>
-                      <div style={{fontSize:9,color:"#064e3b",lineHeight:1.5,marginBottom:4}}>{sc.answer}</div>
-                      <div style={{fontSize:8,color:"#10b981",fontWeight:700}}>{sc.layer}</div>
+                  </>
+                ) : (
+                  <>
+                    <div style={{background:isCorrect?"#ecfdf5":"#fef2f2",border:`1px solid ${isCorrect?"#86efac":"#fecaca"}`,borderRadius:7,padding:"7px 9px"}}>
+                      <div style={{fontSize:11,fontWeight:800,color:isCorrect?"#065f46":"#dc2626",marginBottom:4}}>{isCorrect?"✅ Correct!":"❌ Not quite"}</div>
+                      <div style={{fontSize:9,color:"#475569",fontStyle:"italic",background:"rgba(0,0,0,0.03)",borderRadius:5,padding:"4px 6px",marginBottom:6,lineHeight:1.5}}>Your answer: {diagnosis}</div>
+                      <div style={{fontSize:8,fontWeight:700,color:"#64748b",textTransform:"uppercase",marginBottom:3}}>Root Cause & Fix</div>
+                      <div style={{fontSize:9,color:"#1e293b",lineHeight:1.5,marginBottom:4}}>{sc.answer}</div>
+                      <div style={{fontSize:8,fontWeight:700,color:"#6366f1"}}>{sc.layer}</div>
                     </div>
-                  )}
-                  {fixedLinks.length>0&&<div style={{background:"#ecfdf5",border:"1px solid #86efac",borderRadius:6,padding:"4px 7px",fontSize:9,color:"#166534",fontWeight:700,textAlign:"center"}}>✅ Network restored!</div>}
-                  <button onClick={()=>{
-                    const next=(faultScenarioIdx+1)%faultScenarios.length;
-                    setFaultScenarioIdx(next);
-                    setBrokenLink(faultScenarios[next].brokenLinkIdx);
-                    setFixedLinks([]);setRevealedClues([]);setShowAnswer(false);setRunning(false);
-                  }} style={{width:"100%",padding:"4px 0",borderRadius:6,border:"1px solid #e2e8f0",background:"transparent",color:"#64748b",fontSize:9,cursor:"pointer",fontWeight:600}}>
-                    Next Scenario ({faultScenarioIdx+1}/{faultScenarios.length})
-                  </button>
-                </div>
+                    {fixedLinks.length>0
+                      ? <div style={{background:"#ecfdf5",border:"1px solid #86efac",borderRadius:6,padding:"5px 7px",fontSize:9,color:"#166534",fontWeight:700,textAlign:"center"}}>✅ Network restored!</div>
+                      : <div style={{fontSize:9,color:"#94a3b8",textAlign:"center",padding:"3px 0"}}>← click the red ✕ to fix the network</div>
+                    }
+                    <button onClick={()=>{
+                      const next=(faultScenarioIdx+1)%faultScenarios.length;
+                      setFaultScenarioIdx(next);
+                      setBrokenLink(faultScenarios[next].brokenLinkIdx);
+                      setFixedLinks([]);setRevealedClues([]);setShowAnswer(false);
+                      setDiagnosis("");setSubmitted(false);setIsCorrect(false);setRunning(false);
+                    }} style={{width:"100%",padding:"6px 0",borderRadius:6,border:"none",background:"#0f172a",color:"#fff",fontSize:9,cursor:"pointer",fontWeight:700}}>
+                      Next Scenario ({faultScenarioIdx+1}/{faultScenarios.length})
+                    </button>
+                  </>
+                )}
               </div>
             );
           })() : selected ? (
