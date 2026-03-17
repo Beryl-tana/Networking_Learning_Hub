@@ -382,11 +382,13 @@ function NetSimCanvas({ devices: initialDevices, links: initialLinks, packets, l
               if(!a||!b) return null;
               const ax=a.x+40, ay=a.y+40, bx=b.x+40, by=b.y+40;
               return (
-                <g key={i} onClick={()=>{ if(troubleshootMode && lk.broken) setFixedLinks(prev=>[...prev,i]); }} style={{cursor:lk.broken?"pointer":"default"}}>
+                <g key={i} onClick={()=>{ if(troubleshootMode && lk.broken && showAnswer) setFixedLinks(prev=>[...prev,i]); }} style={{cursor:lk.broken&&showAnswer?"pointer":"default"}}>
                   <line x1={ax} y1={ay} x2={bx} y2={by}
                     stroke={lk.broken?"#ef4444":"#94a3b8"} strokeWidth={lk.broken?3:2.5}
                     strokeDasharray={lk.broken?"8 4":lk.dashed?"6 3":"none"} opacity="0.9"/>
                   {lk.broken && <text x={(ax+bx)/2} y={(ay+by)/2-10} textAnchor="middle" fontSize="18" fill="#ef4444">✕</text>}
+                  {lk.broken && !showAnswer && <text x={(ax+bx)/2} y={(ay+by)/2+18} textAnchor="middle" fontSize="8" fill="#ef4444" opacity="0.7">investigate first →</text>}
+                  {lk.broken && showAnswer && <text x={(ax+bx)/2} y={(ay+by)/2+18} textAnchor="middle" fontSize="8" fill="#10b981" fontWeight="700">click to fix</text>}
                 </g>
               );
             })}
