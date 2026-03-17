@@ -913,7 +913,7 @@ const MODULE_SIMS = {1:Mod1Sim,2:Mod2Sim,3:Mod3Sim,4:Mod4Sim,5:Mod5Sim,6:Mod6Sim
 function LoginScreen({ onLogin }) {
   const [u,setU]=useState(""); const [p,setP]=useState(""); const [err,setErr]=useState(""); const [shake,setShake]=useState(false);
   const attempt=()=>{
-    if(u===LOGIN_USERNAME&&p===LOGIN_PASSWORD) onLogin();
+    if(u.trim().toLowerCase()===LOGIN_USERNAME.toLowerCase()&&p.trim()===LOGIN_PASSWORD) onLogin();
     else { setErr("Incorrect username or password."); setShake(true); setTimeout(()=>setShake(false),500); }
   };
   return (
@@ -959,13 +959,13 @@ function PacketFlow() {
 
 // ── MAIN APP ──
 export default function App() {
-  const [loggedIn,setLoggedIn]=useState(false);
-  const [screen,setScreen]=useState("name");
-  const [name,setName]=useState("");
+  const [loggedIn,setLoggedIn]=useState(()=>localStorage.getItem("nh_auth")==="1");
+  const [screen,setScreen]=useState(()=>localStorage.getItem("nh_name")?"hub":"name");
+  const [name,setName]=useState(()=>localStorage.getItem("nh_name")||"");
   const [nameInput,setNameInput]=useState("");
   const [activeModule,setActiveModule]=useState(null);
 
-  if(!loggedIn) return <LoginScreen onLogin={()=>setLoggedIn(true)}/>;
+  if(!loggedIn) return <LoginScreen onLogin={()=>{localStorage.setItem("nh_auth","1");setLoggedIn(true);}}/>;
 
   const openModule=(mod)=>{ setActiveModule(mod.id); setScreen("module"); };
   const mod=MODULES.find(m=>m.id===activeModule);
@@ -978,10 +978,10 @@ export default function App() {
         <h2 style={{color:"#f1f5f9",fontSize:"1.5rem",fontWeight:700,marginBottom:8}}>Welcome! What's your name?</h2>
         <p style={{color:"#94a3b8",marginBottom:28,fontSize:"0.9rem"}}>Personalise your learning journey</p>
         <input placeholder="Enter your first name..." value={nameInput} onChange={e=>setNameInput(e.target.value)}
-          onKeyDown={e=>e.key==="Enter"&&nameInput.trim()&&(setName(nameInput.trim()),setScreen("hub"))}
+          onKeyDown={e=>e.key==="Enter"&&nameInput.trim()&&(localStorage.setItem("nh_name",nameInput.trim()),setName(nameInput.trim()),setScreen("hub"))}
           style={{width:"100%",padding:"13px 16px",borderRadius:12,border:"1px solid rgba(255,255,255,0.15)",background:"rgba(255,255,255,0.08)",color:"#e2e8f0",fontSize:"1.1rem",outline:"none",boxSizing:"border-box",marginBottom:12,textAlign:"center"}} autoFocus/>
-        <button onClick={()=>nameInput.trim()&&(setName(nameInput.trim()),setScreen("hub"))} style={{width:"100%",padding:13,borderRadius:12,background:"linear-gradient(135deg,#6366f1,#8b5cf6)",color:"#fff",fontWeight:700,fontSize:"1rem",border:"none",cursor:"pointer"}}>Enter the Hub →</button>
-        <button onClick={()=>setLoggedIn(false)} style={{marginTop:10,background:"none",border:"none",color:"#475569",cursor:"pointer",fontSize:"0.85rem"}}>← Sign out</button>
+        <button onClick={()=>nameInput.trim()&&(localStorage.setItem("nh_name",nameInput.trim()),setName(nameInput.trim()),setScreen("hub"))} style={{width:"100%",padding:13,borderRadius:12,background:"linear-gradient(135deg,#6366f1,#8b5cf6)",color:"#fff",fontWeight:700,fontSize:"1rem",border:"none",cursor:"pointer"}}>Enter the Hub →</button>
+        <button onClick={()=>{localStorage.removeItem("nh_auth");localStorage.removeItem("nh_name");setLoggedIn(false);}} style={{marginTop:10,background:"none",border:"none",color:"#475569",cursor:"pointer",fontSize:"0.85rem"}}>← Sign out</button>
       </div>
     </div>
   );
@@ -991,7 +991,7 @@ export default function App() {
       <div style={{background:"linear-gradient(135deg,#0f172a,#1e1b4b)",padding:"14px 20px",display:"flex",alignItems:"center",gap:12}}>
         <div><div style={{color:"#f1f5f9",fontWeight:700}}>Networking Learning Hub</div><div style={{color:"#64748b",fontSize:"0.75rem"}}>Welcome, {name}</div></div>
         <button onClick={()=>setScreen("name")} style={{marginLeft:"auto",background:"rgba(255,255,255,0.08)",border:"1px solid rgba(255,255,255,0.1)",color:"#94a3b8",padding:"6px 12px",borderRadius:8,cursor:"pointer",fontSize:"0.75rem"}}>Switch User</button>
-        <button onClick={()=>{setLoggedIn(false);setScreen("name");setName("");}} style={{background:"rgba(239,68,68,0.15)",border:"1px solid rgba(239,68,68,0.3)",color:"#fca5a5",padding:"6px 12px",borderRadius:8,cursor:"pointer",fontSize:"0.75rem"}}>Sign Out</button>
+        <button onClick={()=>{localStorage.removeItem("nh_auth");localStorage.removeItem("nh_name");setLoggedIn(false);setScreen("name");setName("");}} style={{background:"rgba(239,68,68,0.15)",border:"1px solid rgba(239,68,68,0.3)",color:"#fca5a5",padding:"6px 12px",borderRadius:8,cursor:"pointer",fontSize:"0.75rem"}}>Sign Out</button>
       </div>
       <div style={{maxWidth:740,margin:"0 auto",padding:"24px 16px"}}>
         <PacketFlow/>
