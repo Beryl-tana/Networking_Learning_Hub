@@ -298,209 +298,6 @@ const MODULES = [
 ];
 
 // ── IT SUPPORT DATA ──
-const IT_MODULE_INFO = {
-  1: {
-    whatHappens: "Windows 10 and 11 share the same NT kernel but Windows 11 requires stricter hardware: TPM 2.0, Secure Boot, 64-bit CPU, 4 GB RAM, 64 GB storage. Use winver to see OS version/build, systeminfo for full hardware spec, and msinfo32 for BIOS/Secure Boot state. The PC Health Check Tool gives an instant upgrade eligibility verdict with the exact blocker. SetupDiag analyses a failed upgrade and outputs a FailureRule — your starting point for any upgrade issue.",
-    realExample: "Trainee runs PC Health Check on LAPTOP-047 → 'This PC can't run Windows 11'. Opens msinfo32 → Secure Boot: Off. Opens tpm.msc → 'Compatible TPM cannot be found'. Opens BIOS → finds 'fTPM' option set to Disabled. Enables it, saves, restarts. Reruns PC Health Check → 'This PC can run Windows 11'. Ticket closed in 12 minutes.",
-  },
-  2: {
-    whatHappens: "Event Viewer (eventvwr.msc) is the primary diagnostic tool for any Windows issue. The three key logs are: Application (app crashes and errors), System (OS/driver events), and Setup (Windows Update and upgrade events). Each event has an ID — ID 1000 is an application crash, ID 41 is an unexpected shutdown. Run sfc /scannow (as Admin) to check and repair corrupted system files. DISM /Online /Cleanup-Image /RestoreHealth repairs the Windows image itself if SFC fails.",
-    realExample: "User's app crashes silently every morning. Step 1: Event Viewer → Application log → filter by Error → find Event ID 1000 from 08:30. Step 2: Source says 'Application Error' — faulting module 'ntdll.dll'. Step 3: Run sfc /scannow → 'Windows Resource Protection found corrupt files and repaired them.' App no longer crashes. Root cause: corrupted system DLL — SFC fixed it in 10 minutes.",
-  },
-  3: {
-    whatHappens: "BIOS/UEFI is firmware that initialises hardware before the OS loads. UEFI (modern) supports Secure Boot — which only allows trusted OS bootloaders — and GPT disk partitioning. TPM (Trusted Platform Module) is a security chip that stores encryption keys; Windows 11 requires TPM 2.0. WinRE (Windows Recovery Environment) provides advanced repair tools: Startup Repair, System Restore, Command Prompt (bootrec, chkdsk), and Update Uninstall — all accessible when Windows won't boot normally.",
-    realExample: "Machine fails Windows 11 upgrade: PC Health Check → 'TPM not found'. IT connects via Atera, but BIOS changes require physical or admin-level access. Arrange on-site visit. Tech enters BIOS (Del/F2 at boot), navigates to Security → TPM Configuration → sets to Enabled. Saves. Machine now eligible. Lesson: BIOS blockers cannot be fixed remotely — always document and escalate with clear reason.",
-  },
-  4: {
-    whatHappens: "Remote support is the daily workflow for IT engineers. AnyDesk connects to any device using a 9-digit ID number — works through home routers and NAT without port forwarding. Atera RMM (Remote Monitoring and Management) is the IT dashboard: see all managed devices, their OS, RAM, last-seen status, and run scripts. From Atera, you can launch a Splashtop remote session directly. RDP (Remote Desktop Protocol, TCP port 3389) is Windows' built-in remote tool but requires firewall rules to be opened. UAC prompts on the remote machine will block your input until the local user responds.",
-    realExample: "Support ticket: user in Glasgow can't open any applications. Agent opens Atera → finds LAPTOP-082 → launches Splashtop session. Connected in 20 seconds. Task Manager shows 100% disk usage. Checks HWMonitor → HDD temperature 62°C, reallocated sectors rising. Runs CrystalDiskInfo → SMART status: Caution. Escalates immediately: 'Drive failing — data backup required before any other work.' Caught a data loss situation in under 5 minutes.",
-  },
-  5: {
-    whatHappens: "Autotask PSA (Professional Services Automation) is the ticketing system used at Pace. Every issue becomes a ticket. Ticket types: Incident (something broken), Service Request (planned work), Change (infrastructure modification). Priorities: P1 Critical (site down, <15 min response), P2 High (department affected, <1 hr), P3 Medium (individual, workaround exists, <4 hrs), P4 Low (minor/cosmetic, <2 days). A well-written ticket includes: Account, Contact, Queue, Priority, clear Description, all actions in Work Detail notes, and a complete Resolution note before closing.",
-    realExample: "Agent receives: 'Nothing works.' Ticket created: P2 High (multiple users affected). Description: 'All staff on 2nd floor unable to access file server or internet since 09:15. Local devices ping fine.' Work Detail: 'Checked switch port uplink — unplugged. Reseated cable. All users restored at 09:32.' Resolution: 'Physical layer failure — uplink cable dislodged from switch. Reseated. Verified all users operational.' Closed. Total time: 17 minutes. Good ticket = next engineer can understand exactly what happened.",
-  },
-  6: {
-    whatHappens: "The CompTIA/ITIL 5-step troubleshooting methodology applies to every IT issue: (1) Identify the problem — get exact symptoms, reproduce if possible. (2) Establish a theory — use bottom-up OSI thinking, what's most likely? (3) Test the theory — run targeted diagnostics (ping, ipconfig, Event Viewer, SMART). (4) Implement a solution — fix one thing at a time, confirm it resolves the issue. (5) Verify and document — confirm with the user, write a complete ticket note with root cause, actions taken, and resolution.",
-    realExample: "Ticket: 'Can't print — urgent.' (1) Identify: all staff affected, printer shows Ready on panel. (2) Theory: not the printer — likely print server or spooler. (3) Test: ping print server → responds. Services.msc → Print Spooler: Stopped. (4) Fix: start Print Spooler service, clear stuck jobs from spool folder. (5) Verify: user prints test page successfully. Document: 'Print Spooler service crashed due to corrupt job. Cleared spool and restarted service. All printers restored.' Ticket closed.",
-  },
-};
-
-const IT_FAULT_SCENARIOS = {
-  1: [
-    {
-      title: "PC Health Check says 'This PC can't run Windows 11'",
-      symptom: "You run the PC Health Check Tool on a user's machine — LAPTOP-047. Result: 'This PC can't run Windows 11.' No specific reason is shown by default.",
-      clues: ["Open msinfo32 → Secure Boot State: Off. Open tpm.msc → 'Compatible TPM cannot be found on this computer.' The machine has a TPM chip but it is disabled in BIOS. This is the most common Windows 11 blocker."],
-      answer: "TPM 2.0 disabled in BIOS (Hardware/Firmware). PC Health Check fails because Windows 11 mandates TPM 2.0 and Secure Boot. Fix: Restart the machine, enter BIOS (Del/F2), navigate to Security settings, enable fTPM or PTT (Intel), Save & Exit. Rerun PC Health Check — machine should now pass. Document: 'LAPTOP-047 — TPM enabled in BIOS. Now eligible for Windows 11 upgrade.'",
-      layer: "Hardware/Firmware",
-      keywords: ["tpm", "bios", "secure boot", "health check", "windows 11", "eligible"],
-      brokenLinkIdx: 0
-    },
-    {
-      title: "Windows 11 upgrade fails at 47% with error 0xC1900101",
-      symptom: "Machine DESKTOP-112 started the Windows 11 upgrade. It reached 47% and rolled back with error code 0xC1900101. The machine is now back on Windows 10.",
-      clues: ["Run SetupDiag. Output: FailureRule: DriverBlock. Faulting driver: OldNetworkCard.sys v1.4.2. This driver is on Microsoft's incompatibility list for Windows 11."],
-      answer: "Driver incompatibility blocking Windows 11 upgrade (OS/Driver). Error 0xC1900101 always indicates a driver failure during upgrade. SetupDiag narrows it to OldNetworkCard.sys. Fix: Check the manufacturer's website for a Windows 11-compatible driver. If none exists, remove the device before upgrading. Document findings in the Autotask ticket and escalate to Kurt if no updated driver is available.",
-      layer: "OS/Driver",
-      keywords: ["driver", "0xc1900101", "setupdiag", "upgrade", "incompatible", "driverblock"],
-      brokenLinkIdx: 1
-    },
-    {
-      title: "SetupDiag shows DiskSpaceBlockInDownLevel",
-      symptom: "Machine WS-055 fails upgrade during the download phase. SetupDiag output: FailureRule: DiskSpaceBlockInDownLevel. Upgrade won't proceed.",
-      clues: ["Run dir C:\\ — C: drive shows 24 GB free. Windows 11 upgrade requires a minimum of 64 GB free. Run cleanmgr → 'Clean up system files' → shows 11.4 GB recoverable. Settings → Storage → Storage Sense shows 6 GB of temporary files."],
-      answer: "Insufficient disk space for upgrade (Storage). Windows 11 needs ~64 GB free on C: during the upgrade process. Fix: Run Disk Cleanup (cleanmgr) selecting 'Clean up system files'. Enable Storage Sense. If still insufficient: clear Downloads, empty Recycle Bin, move user files to a network drive. Retry upgrade once at least 64 GB is free. Document space before/after in ticket.",
-      layer: "Storage",
-      keywords: ["disk", "space", "cleanmgr", "storage", "setupdiag", "diskspaceblock"],
-      brokenLinkIdx: 2
-    }
-  ],
-  2: [
-    {
-      title: "Application crashes every morning — no error shown to user",
-      symptom: "A user's business application crashes silently at 08:30 every day. No pop-up, no error message. The app just disappears. Restarting it works fine until the next morning.",
-      clues: ["Open Event Viewer (eventvwr.msc) → Windows Logs → Application → Filter by last 24 hours → find Event ID 1000 at 08:30. Source: Application Error. Faulting application: BusinessApp.exe. Faulting module: ntdll.dll."],
-      answer: "Application crash captured in Event Viewer (Application Log). The app is crashing silently — Event ID 1000 is the standard application crash event. The faulting module ntdll.dll suggests a corrupted system file. Fix: Run sfc /scannow as Administrator. If SFC reports violations and fixes them, the crash should stop. If sfc /scannow fails, run DISM /Online /Cleanup-Image /RestoreHealth first, then SFC again.",
-      layer: "Application/OS",
-      keywords: ["event viewer", "event id 1000", "sfc", "ntdll", "crash", "application log"],
-      brokenLinkIdx: 0
-    },
-    {
-      title: "Windows Update fails every time — no clear error shown",
-      symptom: "Machine keeps failing to install a cumulative update. Windows Update shows 'Failed' with error code 0x80070057 but no further detail.",
-      clues: ["Run: Get-WindowsUpdateLog in PowerShell to generate WindowsUpdate.log. Open the log and search for 'FAILED' — find entries: 'CBS package installation failed. Code = 0x80070057.' CBS.log at C:\\Windows\\Logs\\CBS\\CBS.log shows 'Error: Corrupt component store.'"],
-      answer: "Windows component store corruption causing update failure (OS). Error 0x80070057 in CBS.log indicates the Windows component store (SxS) is corrupt, preventing cumulative updates from installing. Fix: Run DISM /Online /Cleanup-Image /RestoreHealth (repairs component store using Windows Update). Then run SFC /scannow. Retry Windows Update. This process can take 20–40 minutes — document in the ticket.",
-      layer: "OS/Windows Update",
-      keywords: ["windows update", "cbs.log", "dism", "0x80070057", "component store", "corrupt"],
-      brokenLinkIdx: 1
-    },
-    {
-      title: "System File Checker reports violations that can't be repaired",
-      symptom: "After a suspected malware infection was cleaned, the machine behaves erratically. You run sfc /scannow and get: 'Windows Resource Protection found corrupt files but was unable to fix some of them.'",
-      clues: ["SFC log at C:\\Windows\\Logs\\CBS\\CBS.log shows multiple 'Cannot repair member file' entries. The Windows image itself is damaged — SFC cannot repair files using a corrupted source. DISM must be run first to restore the image from Windows Update servers."],
-      answer: "Corrupted Windows image requiring DISM repair (OS). SFC can only repair files if its source (the Windows component store) is intact. When the image itself is corrupt, SFC fails. Fix: (1) Run DISM /Online /Cleanup-Image /RestoreHealth — downloads clean image from Microsoft. (2) Re-run sfc /scannow — should now succeed. (3) Restart and verify system stability. If DISM also fails, a clean Windows reinstall may be required.",
-      layer: "OS",
-      keywords: ["sfc", "dism", "corrupt", "image", "repair", "cbs", "system files"],
-      brokenLinkIdx: 2
-    }
-  ],
-  3: [
-    {
-      title: "PC Health Check fails: 'TPM not found' — BIOS investigation needed",
-      symptom: "LAPTOP-031 fails PC Health Check with 'This PC can't run Windows 11.' Device Manager shows no TPM device. tpm.msc shows 'Compatible TPM cannot be found.'",
-      clues: ["Enter BIOS by restarting and pressing F2/Del. Navigate to Security tab → Advanced Security. Find 'fTPM' (AMD) or 'PTT' (Intel) setting — currently set to Disabled. This is the TPM chip built into the CPU/motherboard, disabled in firmware."],
-      answer: "TPM 2.0 disabled in UEFI/BIOS (Firmware). The machine has a TPM chip but it is turned off in BIOS. Fix: Enable fTPM or PTT in BIOS Security settings. Save and exit. Machine restarts, TPM initialises, tpm.msc now shows 'TPM Ready.' PC Health Check passes. Note: if you cannot access BIOS remotely, escalate for on-site access — BIOS changes cannot be made through remote tools like Atera or AnyDesk.",
-      layer: "Firmware/Hardware",
-      keywords: ["tpm", "bios", "uefi", "ftpm", "ptt", "disabled", "security"],
-      brokenLinkIdx: 0
-    },
-    {
-      title: "Machine won't boot after replacing hard drive — Secure Boot error",
-      symptom: "A user's HDD was replaced with a new SSD. Windows was reinstalled. But the machine now shows 'Secure Boot Violation — Image failed to verify with SECURE BOOT' on every boot attempt.",
-      clues: ["The new SSD was formatted as MBR (not GPT). Secure Boot requires UEFI boot mode which only works with GPT-partitioned disks. The installer defaulted to Legacy/MBR mode because BIOS was set to Legacy."],
-      answer: "MBR disk incompatible with Secure Boot (Firmware/Storage). Secure Boot requires UEFI + GPT. Legacy BIOS mode installs to MBR which breaks Secure Boot. Fix: (1) Enter BIOS → disable Legacy Boot / enable UEFI only. (2) Reinstall Windows — the installer will automatically use GPT on a clean drive in UEFI mode. (3) Verify: msinfo32 → BIOS Mode: UEFI, Secure Boot State: On.",
-      layer: "Firmware/Storage",
-      keywords: ["secure boot", "uefi", "mbr", "gpt", "legacy", "bios mode"],
-      brokenLinkIdx: 1
-    },
-    {
-      title: "Machine stuck in 'Preparing Automatic Repair' loop",
-      symptom: "User's laptop won't boot. It shows the Windows logo, then 'Preparing Automatic Repair' and loops back to the same screen endlessly.",
-      clues: ["Boot into WinRE: hold Shift while clicking Restart, or boot from USB. In WinRE → Troubleshoot → Advanced Options → Command Prompt. Run: bootrec /fixmbr · bootrec /fixboot · bootrec /rebuildbcd. The rebuildbcd shows '0 Windows installations found' — BCD (Boot Configuration Data) is missing."],
-      answer: "Corrupted BCD (Boot Configuration Data) preventing OS load (OS). The BCD tells the bootloader where Windows is. If it's damaged or missing, Windows can't start. Fix via WinRE Command Prompt: (1) bootrec /fixmbr (2) bootrec /fixboot (3) bootrec /rebuildbcd. If rebuildbcd finds 0 installations, also run: bcdboot C:\\Windows. Restart without WinRE — Windows should load normally.",
-      layer: "OS/Boot",
-      keywords: ["winre", "bcd", "bootrec", "boot loop", "automatic repair", "startup repair"],
-      brokenLinkIdx: 2
-    }
-  ],
-  4: [
-    {
-      title: "RDP connection refused — can't connect to user's PC",
-      symptom: "You open Remote Desktop Connection, enter LAPTOP-082's hostname, and immediately receive: 'Remote Desktop can't connect to the remote computer.' The user confirms the PC is on and they're logged in.",
-      clues: ["Ask the user to open Windows Defender Firewall with Advanced Security (wf.msc) → Inbound Rules → search 'Remote Desktop'. The rule 'Remote Desktop - User Mode (TCP-In)' is disabled (grey icon, not green)."],
-      answer: "Windows Firewall blocking RDP inbound (Network/OS). Remote Desktop is enabled in System Properties but the host firewall is blocking port 3389 inbound. Fix: Ask user to right-click 'Remote Desktop - User Mode (TCP-In)' → Enable Rule. Alternatively, run remotely via Atera script: netsh advfirewall firewall set rule name='Remote Desktop - User Mode (TCP-In)' new enable=yes. For company-wide fix: deploy this via GPO.",
-      layer: "Network/OS",
-      keywords: ["rdp", "firewall", "port 3389", "inbound", "remote desktop", "blocked"],
-      brokenLinkIdx: 0
-    },
-    {
-      title: "Atera dashboard shows device as 'Offline' — can't connect",
-      symptom: "You need to support DESKTOP-055 via Atera, but the dashboard shows its status as 'Offline' (grey dot). The user confirms the PC is on and connected to the internet.",
-      clues: ["Ask user to open Services (services.msc) → find 'Atera Agent Service'. Status shows: Stopped. Startup type: Automatic. The agent service crashed and did not auto-restart. The machine is physically online but Atera cannot communicate with it."],
-      answer: "Atera agent service stopped (Application). The Atera RMM agent is a Windows service — if it crashes, the machine disappears from the Atera dashboard. Fix: Ask user to right-click 'Atera Agent Service' → Start. Wait 60 seconds — the machine should appear Online in Atera. If the service keeps crashing, reinstall the Atera agent from the Atera portal. Document the recurring issue for monitoring.",
-      layer: "Application",
-      keywords: ["atera", "agent", "service", "offline", "dashboard", "rmm"],
-      brokenLinkIdx: 1
-    },
-    {
-      title: "AnyDesk connected but all inputs are blocked",
-      symptom: "You establish an AnyDesk session to a user's PC. You can see the desktop and it updates in real time, but keyboard and mouse inputs have no effect on the remote machine.",
-      clues: ["The remote screen is slightly dimmed — a UAC (User Account Control) prompt is present in the background requesting admin credentials. Windows Secure Desktop has activated, blocking all remote input until the prompt is handled locally."],
-      answer: "UAC Secure Desktop blocking remote input (OS/Security). Windows activates Secure Desktop when a UAC prompt appears — this intentionally blocks all remote access to prevent privilege escalation over remote tools. Fix: Ask the user to look at their screen and click 'Yes' or enter the admin password on the UAC prompt. Once dismissed, remote input will resume normally. For repeated IT work: use an account with local admin rights to avoid UAC interruptions.",
-      layer: "OS/Security",
-      keywords: ["anydesk", "uac", "secure desktop", "input", "blocked", "admin", "elevation"],
-      brokenLinkIdx: 2
-    }
-  ],
-  5: [
-    {
-      title: "Critical outage ticket assigned P4 Low priority",
-      symptom: "A ticket comes in: 'Nothing is working — nobody can log in.' The agent who took the call created a P4 Low priority ticket and marked it 'In Progress' without escalating.",
-      clues: ["Check the ticket: Description says 'user reports login issues.' Priority: P4 Low. No escalation note. Meanwhile, the Active Directory server is offline — 200 users are locked out company-wide. This should be a P1 Critical with immediate escalation."],
-      answer: "Wrong priority — P4 assigned to P1 Critical incident (Ticketing). Priority must reflect business impact. 200 users unable to work = P1 Critical (SLA: 15 minutes). Fix: Immediately re-prioritise to P1 Critical. Escalate to Tier 2/3 with clear description: 'AD server offline, all users unable to authenticate, company-wide impact since [time].' Update ticket status to Escalated. Notify the manager. The original agent needs coaching on priority assessment.",
-      layer: "Process/Ticketing",
-      keywords: ["priority", "p1", "critical", "escalation", "sla", "impact", "autotask"],
-      brokenLinkIdx: 0
-    },
-    {
-      title: "Escalation ticket missing information — Tier 2 can't proceed",
-      symptom: "Tier 2 engineer receives an escalated ticket for a Windows 11 upgrade failure. The ticket says: 'Upgrade failed. Couldn't fix it. Escalating.' No machine name, no error code, no actions taken documented.",
-      clues: ["The ticket has: Account name (populated). Priority: P3. Description: 'Upgrade failed. Couldn't fix it. Escalating.' Work Detail: empty. No machine name, no error code, no SetupDiag output, no steps attempted. Tier 2 has to call back the user to start from scratch."],
-      answer: "Incomplete escalation ticket (Documentation/Process). A good escalation ticket must include: (1) Machine name/asset tag. (2) Exact error code (e.g. 0xC1900101). (3) SetupDiag output (FailureRule). (4) All steps you attempted and their outcomes. (5) Why you're escalating (what you can't resolve). Fix: Update the ticket with all missing information before the Tier 2 engineer picks it up. This is a documentation skills issue — every action taken must be recorded in Work Detail as it happens.",
-      layer: "Documentation",
-      keywords: ["escalation", "documentation", "ticket", "work detail", "machine name", "error code"],
-      brokenLinkIdx: 1
-    },
-    {
-      title: "Ticket closed without verifying fix — user reopens same issue",
-      symptom: "A ticket for 'slow computer' was closed by an agent with resolution: 'Cleared temp files and restarted.' Three hours later the user reopens the ticket: 'Still slow. Nothing changed.'",
-      clues: ["Review the ticket history — resolution note says 'Cleared temp files.' No mention of Task Manager check, SMART test, or verifying the fix with the user before closing. The agent closed the ticket without confirmation from the user."],
-      answer: "Ticket closed without user verification (Process/Quality). A ticket should only be closed after: (1) The fix was applied. (2) The issue was reproduced and confirmed resolved. (3) The user confirmed they can work normally. Fix: Reopen the ticket. Investigate properly: check Task Manager for CPU/disk/RAM usage, run CrystalDiskInfo for SMART data, review startup items in msconfig. Document all findings. Only close after user confirms the issue is resolved and signs off.",
-      layer: "Process",
-      keywords: ["verification", "resolution", "user confirmation", "reopen", "closure", "quality"],
-      brokenLinkIdx: 2
-    }
-  ],
-  6: [
-    {
-      title: "Network printer 'Offline' for all 40 users simultaneously",
-      symptom: "All staff report the shared printer suddenly shows 'Offline.' The printer itself has power and displays 'Ready' on its panel. This started 20 minutes ago.",
-      clues: ["Step 1: ping the printer IP → responds. Step 2: Open Services.msc on the print server → Print Spooler: Stopped. Step 3: Check Windows Event Log → System: 'Print Spooler service terminated unexpectedly' at 14:32 — caused by a corrupt print job submitted from LAPTOP-019."],
-      answer: "Print Spooler service crash — follow the 5-step methodology (Application/OS). (1) Identify: all users affected, printer online, issue is server-side. (2) Theory: Print Spooler crashed (it's the most common cause). (3) Test: ping → ok; spooler → stopped. Confirmed. (4) Fix: stop Spooler, delete all files in C:\\Windows\\System32\\spool\\PRINTERS, start Spooler. (5) Verify: test print from a workstation. Document: cause was corrupt job from LAPTOP-019, resolved at 14:49. Closed.",
-      layer: "Application/OS",
-      keywords: ["spooler", "5 step", "methodology", "print", "offline", "service", "troubleshooting"],
-      brokenLinkIdx: 0
-    },
-    {
-      title: "Mapped S: drive disconnects after user moves floors",
-      symptom: "A user moved from the 1st floor to the 3rd floor. Since then, their S:\\ drive keeps dropping with 'Network path not found.' Other 3rd floor users have no issue.",
-      clues: ["Run ipconfig → user's IP: 10.30.5.42 (3rd floor VLAN 30). Other 3rd floor users' IPs: 10.30.5.x (all on VLAN 30 too). Run net use → S: shows 'Unavailable'. Try mapping manually → 'System error 67 has occurred. The network name cannot be found.' Check firewall rules → VLAN 30 has no rule allowing SMB (port 445) to file server 10.10.1.50."],
-      answer: "Missing VLAN firewall rule for SMB (Network). VLAN 30 was added to the network but the firewall rule for file server access was never created. Other 3rd floor users haven't needed the file server yet. Fix: Add firewall rule: Source VLAN 30 (10.30.0.0/16) → Destination 10.10.1.50 TCP port 445 ALLOW. Test: net use S: \\\\10.10.1.50\\share — should connect. Document: VLAN 30 SMB access rule added, verified working.",
-      layer: "Network",
-      keywords: ["vlan", "smb", "445", "firewall", "drive", "mapped", "network path"],
-      brokenLinkIdx: 1
-    },
-    {
-      title: "IT engineer skips Steps 1–2 and can't identify root cause",
-      symptom: "Ticket: 'My Outlook won't open.' IT engineer immediately uninstalls and reinstalls Outlook. Issue persists. Engineer tries repairing Office. Still broken. 2 hours later the issue is unresolved.",
-      clues: ["After the failed fixes, a senior engineer reviews the ticket. They ask: 'Did you check Event Viewer?' The junior engineer says no. Event Viewer → Application log → Event ID 1000: 'Faulting module: OST file corrupted.' One command would have solved this in 5 minutes."],
-      answer: "Skipping the diagnosis steps wastes time (Methodology). The engineer jumped straight to Step 4 (implement solution) without Steps 1–3. Fix: Always follow the 5-step methodology: (1) Identify — ask 'what exactly is the error?' (2) Establish theory — check Event Viewer before touching anything. (3) Test theory — Event ID 1000 points to corrupted OST file. (4) Fix — delete the OST file, Outlook rebuilds it on next launch. (5) Verify — user confirms Outlook opens. Total time with correct process: 8 minutes.",
-      layer: "Process/Methodology",
-      keywords: ["methodology", "5 step", "event viewer", "diagnosis", "ost", "outlook", "process"],
-      brokenLinkIdx: 2
-    }
-  ]
-};
 
 const IT_MODULES = [
   { id:1, title:"Windows OS & Upgrades", color:"#3b82f6", bg:"#eff6ff", desc:"PC Health Check, SetupDiag & prereqs" },
@@ -510,6 +307,81 @@ const IT_MODULES = [
   { id:5, title:"Help Desk & Ticketing", color:"#14b8a6", bg:"#f0fdfa", desc:"Autotask, priorities & escalation" },
   { id:6, title:"Troubleshooting Method", color:"#64748b", bg:"#f8fafc", desc:"5-step process & documentation" },
 ];
+
+const IT_SCENARIOS = {
+  1: [
+    { id:1, question:"You run PC Health Check on LAPTOP-047 and get the message: 'This PC can't run Windows 11.' The user says the machine is only 2 years old. What tools do you open first to diagnose which requirement is failing, and what are you looking for?", keywords:["tpm.msc","tpm","msinfo32","secure boot","pc health check"], correctAnswer:"Open tpm.msc to check TPM status — you need 'TPM Ready' with Specification Version 2.0. Open msinfo32 and check Secure Boot State (must be On) and BIOS Mode (must be UEFI). PC Health Check identifies the blocker; tpm.msc and msinfo32 confirm which requirement is failing.", topic:"PC Health Check Diagnostics" },
+    { id:2, question:"DESKTOP-112 fails the Windows 11 upgrade at 47% and rolls back with error code 0xC1900101. What tool do you run next to find the specific cause, and what information does it give you?", keywords:["setupdiag","driverblock","driver","0xc1900101"], correctAnswer:"Run SetupDiag. It reads the upgrade logs and outputs a FailureRule — for 0xC1900101 this will typically be 'DriverBlock' with the name of the incompatible driver. Check the manufacturer's website for a Windows 11 compatible driver, or remove the device before retrying the upgrade.", topic:"Upgrade Error Diagnosis" },
+    { id:3, question:"SetupDiag output on WS-055 shows: FailureRule: DiskSpaceBlockInDownLevel. Running 'dir C:\\' shows 24 GB free. What is the minimum space required and what steps do you take to free it up?", keywords:["64","cleanmgr","disk cleanup","storage sense","space"], correctAnswer:"Windows 11 requires a minimum of 64 GB free on C: during the upgrade. Run Disk Cleanup (cleanmgr) and select 'Clean up system files' to recover space. Enable Storage Sense in Settings. Clear the Downloads folder and empty the Recycle Bin. Document the before/after space in the Autotask ticket.", topic:"Disk Space Management" },
+    { id:4, question:"A user asks you: 'How do I know if my PC can run Windows 11 before trying to upgrade?' What three tools or checks do you tell them to use, and what does each one verify?", keywords:["pc health check","tpm.msc","msinfo32","systeminfo"], correctAnswer:"1) PC Health Check Tool — gives an instant pass/fail verdict with the specific blocker. 2) tpm.msc — verifies TPM is present and shows Specification Version (need 2.0). 3) msinfo32 — shows BIOS Mode (need UEFI), Secure Boot State (need On), and processor/RAM details.", topic:"Windows 11 Prerequisites" },
+    { id:5, question:"You type 'winver' on a machine and it shows Windows 10, Version 21H2, Build 19044. The user wants to upgrade to Windows 11. What command shows you the full hardware spec including RAM and processor type to assess eligibility?", keywords:["systeminfo","msinfo32","ram","processor","64-bit"], correctAnswer:"Run 'systeminfo' in Command Prompt — it shows Total Physical Memory (need 4 GB+), processor type (need 64-bit), OS version, and BIOS version. Also open msinfo32 for BIOS Mode and Secure Boot State. For a quick pass/fail result, run PC Health Check Tool which checks all requirements automatically.", topic:"Windows 11 Prerequisites" },
+    { id:6, question:"After enabling fTPM in the BIOS Security settings, what must you do next to confirm the machine is now eligible for Windows 11, and what should tpm.msc show?", keywords:["tpm.msc","pc health check","tpm ready","specification version 2.0","rerun"], correctAnswer:"After enabling fTPM, restart the machine and open tpm.msc — it should now show 'The TPM is ready for use' with Specification Version: 2.0. Then rerun PC Health Check Tool to confirm the machine passes all Windows 11 requirements. Document the change in the Autotask ticket.", topic:"PC Health Check Diagnostics" },
+    { id:7, question:"SetupDiag shows FailureRule: UninstallOnUpgrade and names the application 'OldAccountingApp v3.1'. The upgrade has failed twice. What is the correct fix and how do you prevent this issue in future?", keywords:["uninstall","incompatible","app","application","remove"], correctAnswer:"Uninstall OldAccountingApp v3.1 before retrying the upgrade — Windows 11 cannot upgrade while this incompatible application is installed. Check the software vendor's website for a Windows 11 compatible version. After uninstalling, retry the upgrade and document findings in the ticket.", topic:"Upgrade Error Diagnosis" },
+    { id:8, question:"A machine's BIOS shows the setting 'fTPM: Disabled' in the Security tab. The user can access BIOS but doesn't know what to change. Walk through the exact steps to resolve this.", keywords:["enable","ftpm","bios","security","save","exit","restart"], correctAnswer:"In the BIOS Security tab, change fTPM (AMD) or PTT (Intel) from Disabled to Enabled. Save the BIOS settings (typically F10) and Exit. The machine will restart, TPM will initialise, and tpm.msc will now show 'TPM Ready' with Specification Version 2.0. Note: BIOS changes cannot be made remotely via Atera or AnyDesk.", topic:"BIOS/TPM Configuration" },
+    { id:9, question:"PC Health Check fails but tpm.msc shows 'TPM Ready — Version 2.0' and Secure Boot is On. What remaining requirements could still be blocking the upgrade?", keywords:["ram","storage","64 gb","4 gb","processor","64-bit","disk"], correctAnswer:"With TPM 2.0 and Secure Boot confirmed, check: RAM (must be 4 GB+), storage (must have 64 GB+ free on C:), processor (must be 64-bit on the approved CPU list). Run 'systeminfo' to check RAM and processor. Run 'dir C:\\' for disk space. PC Health Check will state the specific failing requirement.", topic:"Windows 11 Prerequisites" },
+    { id:10, question:"You are writing the Autotask resolution note for a completed Windows 11 upgrade. The machine was blocked by a disabled TPM. What key information must your resolution note contain?", keywords:["machine name","tpm","bios","resolution","autotask","upgrade","successful"], correctAnswer:"The resolution note must include: machine name/asset tag (e.g. LAPTOP-047), the specific blocker (fTPM disabled in BIOS), the exact fix applied (enabled fTPM in BIOS Security settings), verification steps (tpm.msc showing TPM Ready 2.0, PC Health Check passing), and confirmation that the upgrade completed successfully.", topic:"Ticket Documentation" },
+  ],
+  2: [
+    { id:1, question:"A user's application closes silently every morning at 08:30 with no error message. Where do you look in Event Viewer, what Event ID do you expect, and what information does it tell you?", keywords:["event viewer","application","event id 1000","id 1000","faulting","crash"], correctAnswer:"Open Event Viewer (eventvwr.msc) → Windows Logs → Application → Filter by Level: Error, and look for events around 08:30. Event ID 1000 is the standard application crash event — it shows the faulting application name, the faulting module (e.g. ntdll.dll), and the exact crash time.", topic:"Application Log Diagnostics" },
+    { id:2, question:"Windows Update fails repeatedly with error code 0x80070057. Where is the detailed log for this, and what does the error indicate at that level?", keywords:["cbs.log","cbs","component store","0x80070057","corrupt","dism"], correctAnswer:"Check C:\\Windows\\Logs\\CBS\\CBS.log — search for 'FAILED' or '0x80070057'. This error indicates the Windows component store (SxS) is corrupt, preventing updates from installing. Run DISM /Online /Cleanup-Image /RestoreHealth (repairs component store) then SFC /scannow.", topic:"Windows Update Diagnostics" },
+    { id:3, question:"You run sfc /scannow and get: 'Windows Resource Protection found corrupt files but was unable to fix some of them.' What is the next step and why must it be done in this order?", keywords:["dism","restorehealth","image","component store","sfc","repair"], correctAnswer:"Run DISM /Online /Cleanup-Image /RestoreHealth first. SFC cannot repair files if the Windows component store (its replacement file source) is itself corrupt. DISM downloads a clean image from Microsoft servers to repair the store. After DISM completes, run sfc /scannow again — it should now succeed.", topic:"SFC and DISM Repair" },
+    { id:4, question:"A machine is rebooting unexpectedly without warning. Which Event Viewer log and which Event ID would confirm this is an unexpected power failure or crash?", keywords:["system","event id 41","id 41","kernel power","unexpected","reboot","shutdown"], correctAnswer:"Check Event Viewer → Windows Logs → System → filter by Error/Critical. Event ID 41, Source: Kernel-Power means the system shut down without a clean shutdown sequence — indicating a crash, power cut, or hard reset. Event ID 6008 'Unexpected shutdown' will also appear alongside it.", topic:"System Log Diagnostics" },
+    { id:5, question:"After cleaning a malware infection, SFC /scannow fails. You run DISM RestoreHealth and it also fails with 'Source files could not be found.' What does this mean and what options remain?", keywords:["reinstall","clean install","windows","offline","source","usb","mount"], correctAnswer:"When both SFC and DISM fail, the Windows image is too severely corrupted for online repair. Options: (1) Run DISM with a local source using a mounted Windows ISO: DISM /Source:D:\\sources\\install.wim. (2) If that fails, a clean Windows reinstall is required. Document all repair attempts and escalate to a senior engineer.", topic:"SFC and DISM Repair" },
+    { id:6, question:"You need to find exactly which Windows updates failed on a machine. Get-WindowsUpdateLog has been run. What file does it create, where, and what do you search for inside it?", keywords:["windowsupdate.log","desktop","failed","search","cbs","error"], correctAnswer:"Get-WindowsUpdateLog creates WindowsUpdate.log on the Desktop. Open it and search for 'FAILED' or 'error' to find failed update events. Look for CBS package installation failures and error codes. Cross-reference with CBS.log at C:\\Windows\\Logs\\CBS\\CBS.log for more detail on component store errors.", topic:"Windows Update Diagnostics" },
+    { id:7, question:"A print server's Event Viewer System log shows Event ID 7023 with source 'Service Control Manager'. What does this mean and what do you do next?", keywords:["service","terminated","unexpectedly","services.msc","7023","start","restart"], correctAnswer:"Event ID 7023 means a Windows service terminated unexpectedly. Check the event description for the service name (e.g. Print Spooler). Open services.msc, find that service, and check its status. Right-click → Start to restart it. If it keeps crashing, check the Application log for related errors from that service.", topic:"System Log Diagnostics" },
+    { id:8, question:"You suspect an account is locked out by failed login attempts from a specific PC. Which Event Viewer log, which Event ID, and which piece of information in the event identifies the source machine?", keywords:["security","event id 4740","4740","caller computer","workstation","locked out"], correctAnswer:"Check Event Viewer → Windows Logs → Security → filter for Event ID 4740 (Account Lockout). The event details show the locked account name and the Caller Computer Name — the machine from which the failed logins originated. Event ID 4625 (failed logon) provides the logon type and source IP for additional context.", topic:"Security Log Diagnostics" },
+    { id:9, question:"Event ID 1000 in the Application log shows faulting module: ntdll.dll for a crashing application. What does this typically indicate and what is the fix?", keywords:["sfc","system files","corrupt","ntdll","system","scannow","repair"], correctAnswer:"ntdll.dll is a core Windows system DLL — when it's the faulting module, it typically indicates corrupted Windows system files rather than a fault in the application. Run sfc /scannow as Administrator to check and repair system files. If SFC finds violations and fixes them, the crash should stop. If SFC fails, run DISM /Online /Cleanup-Image /RestoreHealth first.", topic:"Application Log Diagnostics" },
+    { id:10, question:"A machine had a sudden reboot three days ago. The user doesn't know what happened. Walk through exactly how you use Event Viewer to piece together what occurred.", keywords:["system","event viewer","id 41","id 6008","filter","time","application","error"], correctAnswer:"Open Event Viewer → Windows Logs → System. Filter by date to three days ago. Look for Event ID 41 (Kernel Power — unexpected shutdown) or ID 6008 (unexpected shutdown record) and note the exact time. Then check the Application log at the same time window for any critical errors just before the shutdown. Build a timeline from the events to identify the root cause.", topic:"System Log Diagnostics" },
+  ],
+  3: [
+    { id:1, question:"tpm.msc on LAPTOP-031 shows 'Compatible TPM cannot be found on this computer.' Device Manager also shows no TPM device. The machine is 3 years old. What is the most likely cause and what do you do?", keywords:["bios","ftpm","ptt","disabled","security","enable"], correctAnswer:"The most likely cause is that the TPM chip (fTPM on AMD or PTT on Intel) is disabled in BIOS. Enter BIOS by restarting and pressing F2 or Delete. Navigate to Security tab → Advanced Security. Find fTPM or PTT and change it from Disabled to Enabled. Save and exit. tpm.msc will then show 'TPM Ready' with Specification Version 2.0.", topic:"TPM Configuration" },
+    { id:2, question:"After replacing a user's HDD with a new SSD and reinstalling Windows, the machine shows 'Secure Boot Violation — Image failed to verify with SECURE BOOT' on every boot. What caused this and how do you fix it?", keywords:["uefi","gpt","legacy","mbr","secure boot","reinstall"], correctAnswer:"The installer defaulted to Legacy/MBR mode because BIOS was set to Legacy boot. Secure Boot requires UEFI mode + GPT-partitioned disk. Fix: Enter BIOS and disable Legacy Boot / enable UEFI Only. Then reinstall Windows — in UEFI mode the installer automatically uses GPT. Verify with msinfo32: BIOS Mode: UEFI, Secure Boot State: On.", topic:"Secure Boot Configuration" },
+    { id:3, question:"A laptop shows 'Preparing Automatic Repair' on an endless loop and never boots into Windows. How do you access the recovery environment and what commands do you run?", keywords:["winre","shift","restart","bootrec","fixmbr","rebuildbcd","advanced options"], correctAnswer:"Access WinRE by holding Shift while clicking Restart, or boot from a Windows USB drive. In WinRE: Troubleshoot → Advanced Options → Command Prompt. Run: bootrec /fixmbr, bootrec /fixboot, bootrec /rebuildbcd. If rebuildbcd finds 0 Windows installations, also run: bcdboot C:\\Windows. Restart — Windows should load normally.", topic:"WinRE Boot Recovery" },
+    { id:4, question:"msinfo32 shows 'BIOS Mode: Legacy' on a machine you are preparing for a Windows 11 upgrade. Why is this a problem and what changes are needed?", keywords:["uefi","secure boot","gpt","legacy","bios mode","windows 11"], correctAnswer:"Legacy BIOS mode does not support Secure Boot or GPT partitioning — both required for Windows 11. You need to: 1) Enter BIOS and switch to UEFI Only mode. 2) Convert the disk to GPT using MBR2GPT.exe /convert (non-destructive) or reinstall Windows in UEFI mode. 3) Enable Secure Boot. Verify: msinfo32 → BIOS Mode: UEFI, Secure Boot State: On.", topic:"UEFI Configuration" },
+    { id:5, question:"bootrec /rebuildbcd shows '0 Windows installations identified.' What does this mean and what additional command resolves it?", keywords:["bcdboot","windows","c:\\windows","boot files","bcd"], correctAnswer:"'0 Windows installations identified' means the BCD scanner cannot find any Windows installations. Run: bcdboot C:\\Windows — this copies boot files from the Windows directory and creates a new BCD store pointing to the Windows installation on C:. After bcdboot completes, restart normally.", topic:"WinRE Boot Recovery" },
+    { id:6, question:"A recent Windows update caused the machine to blue-screen on every startup. The machine boots into WinRE. Which WinRE tool is the most appropriate first step?", keywords:["uninstall updates","quality update","feature update","winre","troubleshoot"], correctAnswer:"In WinRE: Troubleshoot → Advanced Options → Uninstall Updates. Choose to remove the last Quality Update or Feature Update. This is a safe, reversible step that avoids data loss. If this doesn't resolve the issue, try System Restore (if restore points exist) before considering Reset this PC.", topic:"WinRE Boot Recovery" },
+    { id:7, question:"tpm.msc shows TPM is present but the Specification Version is 1.2, not 2.0. What does this mean for Windows 11 and what options does the IT team have?", keywords:["tpm 2.0","windows 11","upgrade","incompatible","1.2","not supported"], correctAnswer:"Windows 11 requires TPM 2.0 — TPM 1.2 is a hardware limitation that cannot be upgraded through software. First check if the BIOS has an fTPM/PTT option that is a higher version (the embedded CPU TPM may be 2.0 even when a discrete 1.2 chip is present). If no TPM 2.0 option exists, the machine is not eligible. Document and escalate for hardware replacement discussion.", topic:"TPM Configuration" },
+    { id:8, question:"After making BIOS changes to enable UEFI and Secure Boot, how do you verify the changes took effect without re-entering the BIOS?", keywords:["msinfo32","bios mode","uefi","secure boot state","on","tpm.msc"], correctAnswer:"Open msinfo32 (Windows key + R → msinfo32). Check: BIOS Mode (must show UEFI) and Secure Boot State (must show On). Also open tpm.msc to verify TPM is ready with Specification Version 2.0. These three checks confirm all firmware requirements for Windows 11 are met.", topic:"UEFI Configuration" },
+    { id:9, question:"During a remote Atera session, a user reports their machine can't boot — it shows a 'Preparing Automatic Repair' loop. Can you fix this remotely, and what do you do?", keywords:["no","remote","cannot","physical","atera","winre","on-site","local"], correctAnswer:"WinRE and BIOS access cannot be performed through Atera, AnyDesk, or RDP — these tools only work once the OS has loaded. Arrange on-site access, or guide the user verbally over the phone to boot from a Windows USB drive and navigate WinRE options. Log the issue in Autotask and dispatch a field engineer if the user cannot follow phone guidance.", topic:"Remote vs On-site Limitations" },
+    { id:10, question:"After running bootrec /fixmbr and bootrec /fixboot in WinRE, the machine still shows the same boot loop. What is the next command and what does it do?", keywords:["rebuildbcd","boot configuration","bcd","bootrec","rebuilds","boot menu"], correctAnswer:"Run bootrec /rebuildbcd — this scans all drives for compatible Windows installations and rebuilds the Boot Configuration Data (BCD) file that tells the bootloader where to find Windows. If it shows '0 Windows installations identified', additionally run bcdboot C:\\Windows to create fresh boot files.", topic:"WinRE Boot Recovery" },
+  ],
+  4: [
+    { id:1, question:"Atera shows DESKTOP-055 as 'Offline' (grey dot) but the user confirms the PC is on and connected to the internet. What is the most likely cause and how do you resolve it without going on-site?", keywords:["atera agent","service","services.msc","stopped","start","agent service"], correctAnswer:"The Atera Agent Service has likely stopped. Ask the user to open services.msc (Windows key + R → services.msc), find 'Atera Agent Service', and check its status. If Stopped, right-click → Start. Wait 60 seconds — the device should appear Online in Atera. If the service keeps stopping, reinstall the Atera agent from the Atera admin portal.", topic:"Atera RMM Troubleshooting" },
+    { id:2, question:"You have an AnyDesk session open to a remote user's PC. You can see the screen updating but your keyboard and mouse have no effect. What is causing this and what is the fix?", keywords:["uac","secure desktop","prompt","admin","yes","user","click","elevation"], correctAnswer:"A UAC (User Account Control) prompt has appeared, triggering Windows Secure Desktop. Secure Desktop intentionally blocks all remote input to prevent privilege escalation via remote tools. Ask the user to look at their physical screen and click 'Yes' on the UAC prompt. Once dismissed, your keyboard and mouse control will resume automatically.", topic:"AnyDesk Remote Support" },
+    { id:3, question:"You attempt an RDP connection to LAPTOP-082 and immediately receive: 'Remote Desktop can't connect to the remote computer.' The user confirms the PC is on and Remote Desktop is enabled in System Properties. What do you check?", keywords:["firewall","wf.msc","inbound","tcp-in","3389","rule","remote desktop","enable"], correctAnswer:"Check the Windows Defender Firewall. Ask the user to open wf.msc → Inbound Rules → search for 'Remote Desktop'. The rule 'Remote Desktop - User Mode (TCP-In)' may be disabled (grey icon). Right-click → Enable Rule. Alternatively, run via Atera: netsh advfirewall firewall set rule name='Remote Desktop - User Mode (TCP-In)' new enable=yes", topic:"RDP Troubleshooting" },
+    { id:4, question:"A field engineer needs to support a home worker whose home router does not allow port forwarding. Which remote tool should be used and why does it work through the home router?", keywords:["anydesk","nat","outbound","relay","cloud","port forwarding","home"], correctAnswer:"Use AnyDesk. Both the home user and the IT engineer connect outbound to AnyDesk's cloud relay server — neither side needs to accept inbound connections or configure port forwarding. The relay proxies the session between both endpoints, allowing it to work through NAT and home routers without any network configuration.", topic:"AnyDesk Remote Support" },
+    { id:5, question:"Before starting a remote Atera session with a user, what three things should you check in the Atera dashboard about the device, and why does each matter?", keywords:["os","ram","last seen","online","status","device","atera"], correctAnswer:"1) Online status — confirm the device is showing Online before attempting to connect. 2) OS version and build — know what you're working with before you start. 3) RAM and disk usage — low resources may explain performance issues before you even connect. Also check 'Last Seen' timestamp to confirm the agent is actively reporting.", topic:"Atera RMM Troubleshooting" },
+    { id:6, question:"What TCP port does RDP use, and what must be configured on the remote machine's firewall for RDP to work?", keywords:["3389","tcp","inbound","firewall","rule","rdp","port"], correctAnswer:"RDP uses TCP port 3389. The remote machine's Windows Defender Firewall must have an inbound rule enabled for TCP port 3389 — specifically 'Remote Desktop - User Mode (TCP-In)'. If the machine is on a corporate network, the network firewall may also need to allow TCP 3389 inbound.", topic:"RDP Troubleshooting" },
+    { id:7, question:"You are supporting a user via AnyDesk. They need software installed that requires admin privileges. A UAC prompt appears and the user has stepped away from their desk. What happens and what do you do?", keywords:["uac","blocked","secure desktop","input","user","desk","wait","call"], correctAnswer:"Windows Secure Desktop blocks all remote input when a UAC prompt appears — your AnyDesk inputs are frozen until the UAC is dismissed locally. Call or message the user to return to their desk to click 'Yes'. For future sessions, consider connecting with a local admin account to avoid UAC interruptions during software installations.", topic:"AnyDesk Remote Support" },
+    { id:8, question:"The Atera agent has been reinstalled but the device still shows Offline after 5 minutes. What else could prevent the agent from communicating with Atera?", keywords:["firewall","443","outbound","https","block","antivirus","network"], correctAnswer:"The Atera agent communicates over HTTPS (port 443) outbound to Atera's cloud servers. Check: 1) Windows Firewall — no rule should block outbound HTTPS for the Atera agent executable. 2) Corporate proxy/network firewall — may be blocking Atera's domain. 3) Antivirus — may be quarantining the agent. Add the Atera agent directory to antivirus exclusions if needed.", topic:"Atera RMM Troubleshooting" },
+    { id:9, question:"A user is in a different city and needs support. Atera shows their device as Online. Walk through the preferred remote support workflow from opening Atera through to closing the ticket.", keywords:["atera","splashtop","connect","session","autotask","ticket","close"], correctAnswer:"1) Open Atera → find the device by name or account. 2) Check device details (OS, RAM, last seen). 3) Click Connect → launch Splashtop session. 4) Ask user to stay at their desk. 5) Run diagnostics (Task Manager, Event Viewer, ipconfig as needed). 6) Apply fix and verify with the user. 7) Disconnect. 8) Update the Autotask ticket with actions taken and resolution. 9) Close ticket after user confirmation.", topic:"Remote Support Workflow" },
+    { id:10, question:"A user says RDP from home is 'too slow.' Which alternative tool should you suggest and what is the key technical reason it performs differently on home internet connections?", keywords:["anydesk","splashtop","compression","relay","optimised","home","vpn","performance"], correctAnswer:"Suggest AnyDesk or Splashtop. Both use proprietary compression algorithms optimised for low-bandwidth, variable-latency connections. RDP over the internet struggles with latency and packet loss on residential connections. AnyDesk and Splashtop route through cloud relays with adaptive compression. A properly configured VPN with split tunnelling can also improve RDP performance.", topic:"Remote Support Workflow" },
+  ],
+  5: [
+    { id:1, question:"A ticket arrives: 'Nothing is working — nobody can log in.' Investigation reveals the Active Directory server is offline, affecting all 200 users. The agent assigned P4 Low priority. What priority should this be and what must happen immediately?", keywords:["p1","critical","escalate","priority","ad","all users","sla","15 min"], correctAnswer:"This is P1 Critical — a site-wide outage affecting all users (SLA: respond within 15 minutes). Immediately re-prioritise to P1 Critical, update the description to reflect full scope ('AD server offline, 200 users unable to authenticate, company-wide impact since [time]'), escalate to Tier 2/3, and notify the manager.", topic:"Ticket Priority Assessment" },
+    { id:2, question:"Tier 2 receives an escalated ticket that reads: 'Upgrade failed. Couldn't fix it. Escalating.' They must now call the user back to start from scratch. What should the escalation note have contained?", keywords:["machine name","error code","setupdiag","steps","actions","taken","description","asset"], correctAnswer:"A proper escalation note must include: (1) Machine name/asset tag. (2) Exact error code (e.g. 0xC1900101). (3) SetupDiag output (FailureRule). (4) All steps attempted and their results. (5) Why you are escalating (what you cannot resolve). (6) Any time pressure or user impact. Tier 2 should be able to continue without contacting the user for basic information.", topic:"Ticket Documentation" },
+    { id:3, question:"An agent closes a 'slow computer' ticket with resolution: 'Cleared temp files and restarted.' Three hours later the user reopens it. What process failure occurred and how should the agent have handled it?", keywords:["verify","user confirmation","confirm","resolved","reopen","close","verify fix"], correctAnswer:"The agent closed the ticket without verifying the fix with the user or investigating root cause. A ticket should only be closed after: (1) The fix was applied. (2) The issue was confirmed resolved. (3) The user confirmed they can work normally. The agent should have checked Task Manager and run CrystalDiskInfo before applying any fix, and confirmed with the user before closing.", topic:"Ticket Closure Process" },
+    { id:4, question:"A single user cannot access the shared drive. The IT admin has already mapped a temporary network path as a workaround. What priority is this ticket and what is the response SLA?", keywords:["p3","medium","4 hours","workaround","single user","exists"], correctAnswer:"P3 Medium — a single user is affected and a workaround already exists. The SLA is to respond within 4 hours. Document the workaround in work detail, investigate and resolve the root cause (check VLAN rules, drive mapping settings, file server permissions), and confirm with the user once the permanent fix is in place.", topic:"Ticket Priority Assessment" },
+    { id:5, question:"A department head's entire team of 12 cannot access email. IT confirms the Exchange server is responding but the issue is ongoing. What priority is this and why?", keywords:["p2","high","department","1 hour","multiple users","affected","team"], correctAnswer:"P2 High — a department (multiple users) is affected and email is a critical business function. The SLA is to respond within 1 hour. This would only be P1 if it were site-wide or affecting the entire company. Log as P2 High, assign immediately, and update the ticket every 30 minutes if ongoing.", topic:"Ticket Priority Assessment" },
+    { id:6, question:"What is the difference between an Incident ticket and a Service Request ticket in Autotask? Give an example of each.", keywords:["incident","unplanned","broken","service request","planned","install","setup","scheduled"], correctAnswer:"An Incident is an unplanned event causing degradation or outage — something broken (e.g. 'Laptop won't boot', 'Email server down'). A Service Request is planned work initiated by the user or business — not something broken (e.g. 'Install Microsoft Office on new laptop', 'Set up new user account'). Incidents have priority SLAs; Service Requests are scheduled.", topic:"Ticket Types" },
+    { id:7, question:"You are writing Work Detail notes during a live support session. What principle should guide what you record and when?", keywords:["as you go","each step","action","taken","result","real-time","document"], correctAnswer:"Record each action as you take it, in real time — not in a batch at the end. Note what you did, what result it produced, and any error messages or findings. This ensures nothing is forgotten and creates an accurate timeline. If you hand off the ticket, the next engineer can see exactly what has been done without asking.", topic:"Ticket Documentation" },
+    { id:8, question:"A user's screen orientation is stuck in portrait mode after an accidental keypress. They can still work but want it fixed. What priority, and what does this tell you about P4?", keywords:["p4","low","cosmetic","minor","2 days","non-urgent","not impacting","functionality"], correctAnswer:"P4 Low — this is a minor cosmetic issue that does not prevent the user from working. The SLA is to respond within 2 business days. P4 is for non-urgent issues where no business function is impaired. Log it, schedule a fix at a convenient time, and confirm with the user when resolved.", topic:"Ticket Priority Assessment" },
+    { id:9, question:"You have resolved a printer issue for a user. The printer is now printing normally. Walk through the exact steps to properly close this ticket in Autotask.", keywords:["work detail","resolution","user confirm","close","root cause","actions taken"], correctAnswer:"1) In Work Detail, record all actions: 'Stopped Print Spooler, cleared spool folder, restarted Spooler service.' 2) Ask the user to print a test page and confirm it works. 3) Write the Resolution note: 'Root cause: Print Spooler crashed due to corrupt job. Cleared spool and restarted service. User confirmed all printers restored at [time].' 4) Change ticket status to Closed. Never close until the user confirms.", topic:"Ticket Closure Process" },
+    { id:10, question:"A colleague escalates a ticket to you but the machine name is missing. You need to connect via Atera to diagnose the issue. Why is the missing machine name a critical problem?", keywords:["machine name","atera","cannot find","device","identify","asset","ticket quality","documentation"], correctAnswer:"Without the machine name or asset tag, you cannot locate the device in Atera — you cannot initiate a remote session, run scripts, or check device status. You must contact the original agent or the user again for information that should have been captured at the start. Every ticket must include the machine name at creation — it is the minimum identifier needed for any remote support workflow.", topic:"Ticket Documentation" },
+  ],
+  6: [
+    { id:1, question:"All 40 users report the shared printer is 'Offline.' The printer panel shows 'Ready.' Using the 5-step troubleshooting methodology, what are your first two steps and what specific actions do they involve?", keywords:["identify","theory","ping","spooler","services","step 1","step 2","bottom-up"], correctAnswer:"Step 1 — Identify: Confirm all users are affected, note the printer panel shows Ready (hardware is fine), establish when it started. Step 2 — Establish a Theory: Since the printer hardware is fine and all users are affected, the issue is server-side. Most likely: Print Spooler service has crashed. Ping the print server first to confirm it's reachable, then check the Spooler service in services.msc.", topic:"5-Step Troubleshooting" },
+    { id:2, question:"An engineer receives a ticket: 'Outlook won't open.' Without checking Event Viewer, they uninstall/reinstall Outlook twice, then repair Office. 2 hours later: unresolved. What went wrong?", keywords:["step 1","step 2","identify","theory","event viewer","skipped","diagnosis","methodology"], correctAnswer:"The engineer skipped Steps 1 and 2 — they went straight to Step 4 (implement solution) without identifying the exact problem or establishing a theory. Event Viewer → Application log → Event ID 1000 would have shown a corrupted OST file in under 2 minutes. Correct fix: delete the OST file and let Outlook rebuild it (8-minute fix). Always diagnose before fixing.", topic:"5-Step Troubleshooting" },
+    { id:3, question:"You have confirmed at Step 3 that the Print Spooler service is stopped. You are now at Step 4. What is the correct way to implement the fix?", keywords:["start","spooler","spool","printers","folder","clear","restart service","one change"], correctAnswer:"Step 4 — Implement the fix: Stop the Print Spooler service (services.msc), delete all files in C:\\Windows\\System32\\spool\\PRINTERS (the corrupt jobs causing the crash), then Start the Print Spooler service. Make only this one change — do not restart the server or make other changes simultaneously. This keeps the fix targeted and attributable.", topic:"5-Step Troubleshooting" },
+    { id:4, question:"After restarting the Print Spooler service, printing appears to work from your test account. What does Step 5 require you to do before closing the Autotask ticket?", keywords:["verify","user","confirm","document","resolution","root cause","close","ticket"], correctAnswer:"Step 5 — Verify and Document: Ask one of the affected users to print a test document and confirm it works from their account. Once confirmed, write the Resolution note: document the root cause (corrupt print job crashed Spooler), actions taken (cleared spool folder, restarted service), and verification (user confirmed printing restored at [time]). Close the ticket only after user confirmation.", topic:"5-Step Troubleshooting" },
+    { id:5, question:"A user says 'nothing works.' You are at Step 1 of the troubleshooting methodology. What specific questions do you ask to properly identify the problem, and why does this matter?", keywords:["what","when","which","error","app","affected","reproduce","specific","symptom"], correctAnswer:"Step 1 — Identify: Ask: (1) What specifically can't you do? (which application or service). (2) What exact error message do you see? (3) When did it start? (4) Did anything change recently? (5) Is anyone else affected? This matters because 'nothing works' could mean many different things — you cannot establish a theory until you have specific, reproducible symptoms.", topic:"Problem Identification" },
+    { id:6, question:"During Step 2 of troubleshooting a network connectivity issue, you apply 'bottom-up' thinking. Starting from the bottom, what is the first layer you check and what specific action does this involve?", keywords:["physical","layer 1","cable","link","light","led","nic","bottom-up"], correctAnswer:"Bottom-up means starting at the Physical layer (Layer 1). Check: Is the network cable plugged in and seated? Is the NIC LED showing a link light? Is the cable damaged? This takes 10 seconds and rules out the most common cause. Do not check DNS, IP settings, or applications until you have confirmed the physical connection is intact.", topic:"Systematic Diagnosis" },
+    { id:7, question:"An engineer fixes a 'slow PC' by simultaneously upgrading RAM from 8 GB to 16 GB and installing a new SSD. The PC is now fast. What is the problem with this approach?", keywords:["one change","simultaneously","don't know","which","fix","isolated","cause","one at a time"], correctAnswer:"The engineer made two changes simultaneously — you cannot determine which change fixed the issue. If a problem arises later, you wouldn't know the root cause. The correct approach: make one change, measure the result, then make the next change if needed. This keeps each change attributable and makes root cause analysis reliable.", topic:"Systematic Diagnosis" },
+    { id:8, question:"You have finished troubleshooting a VPN issue for a remote user. The VPN is now connecting. You write the resolution note. What must the note include to meet the Step 5 standard?", keywords:["root cause","actions taken","resolution","user confirmed","time","close","what","fix"], correctAnswer:"The resolution note must include: (1) Root cause — what was actually wrong. (2) Actions taken — what you did to fix it. (3) Verification — how you confirmed it works (e.g. 'User confirmed VPN connects successfully'). (4) Time of resolution. Close the ticket only after all four elements are documented.", topic:"Documentation Standards" },
+    { id:9, question:"A user's mapped S: drive disconnects after moving to the 3rd floor. Other 3rd floor users have no issue. How does the 5-step methodology guide your investigation?", keywords:["identify","theory","vlan","smb","445","test","one user","systematic","diagnose"], correctAnswer:"(1) Identify: one user affected after moving desks, others on same floor fine. (2) Theory: their machine is on a different VLAN or has a different network config. (3) Test: run ipconfig — check VLAN subnet vs working users. Run net use — check S: status. Test SMB (port 445) to the file server. (4) Fix: add VLAN firewall rule for SMB if that's the gap. (5) Verify and document. Systematic approach avoids guessing.", topic:"5-Step Troubleshooting" },
+    { id:10, question:"Two engineers spent 3 hours each on the same recurring printer issue this month. Neither documented beyond 'Printer fixed.' What process failure does this represent and what is the remedy?", keywords:["documentation","resolution","root cause","recurring","knowledge","ticket","work detail","repeat"], correctAnswer:"This is a documentation failure — without recording root cause, actions taken, and resolution in Autotask, the next engineer starts from scratch every time. Step 5 requires full documentation so knowledge is captured. The remedy: mandate that every closed ticket includes root cause, commands run, fix applied, and how the fix was verified. This builds a knowledge base that reduces resolution time for recurring issues.", topic:"Documentation Standards" },
+  ],
+};
 
 const lerp = (a,b,t) => a+(b-a)*t;
 
@@ -1548,364 +1420,174 @@ function InfoPanel({ moduleId, color, infoData=MODULE_INFO }) {
 const MODULE_SIMS = {1:Mod1Sim,2:Mod2Sim,3:Mod3Sim,4:Mod4Sim,5:Mod5Sim,6:Mod6Sim};
 
 // ── IT MODULE SIMULATORS ──
-function ITMod1Sim() {
-  const [faultActive,setFaultActive]=useState(false);
-  const devices=[
-    {id:"pc",type:"pc",label:"User PC",x:30,y:80,ip:"192.168.1.50",role:"Windows Workstation",color:"#3b82f6"},
-    {id:"tool",type:"laptop",label:"PC Health",x:30,y:240,ip:"—",role:"PC Health Check Tool",color:"#3b82f6"},
-    {id:"wsus",type:"server",label:"Update Srv",x:290,y:80,ip:"192.168.1.20",role:"WSUS / Windows Update",color:"#3b82f6"},
-    {id:"bios",type:"router",label:"BIOS/TPM",x:290,y:240,ip:"—",role:"Firmware & TPM Chip",color:"#3b82f6"},
-    {id:"diag",type:"server",label:"SetupDiag",x:510,y:160,ip:"—",role:"Upgrade Diagnostic Tool",color:"#3b82f6"},
-  ];
-  const links=[{from:"pc",to:"tool"},{from:"pc",to:"wsus"},{from:"pc",to:"bios"},{from:"wsus",to:"diag"},{from:"bios",to:"diag"}];
-  const packets=[{id:"p1",from:"pc",to:"bios",color:"#3b82f6",label:"Check"},{id:"p2",from:"wsus",to:"diag",color:"#6366f1",label:"Log"},{id:"p3",from:"pc",to:"tool",color:"#10b981",label:"Scan"}];
-  return (
-    <div style={{display:"flex",flexDirection:"column",gap:10,height:"100%"}}>
-      <div style={{height:340,flexShrink:0}}>
-        <NetSimCanvas devices={devices} links={links} packets={packets} label="Windows OS Upgrade Flow" desc="PC Health Check, BIOS/TPM verification, and SetupDiag output." color="#3b82f6" faultScenarios={IT_FAULT_SCENARIOS[1]} onFaultModeChange={setFaultActive}/>
-      </div>
-      {!faultActive&&(
-        <div style={{flex:1,display:"flex",gap:10,minHeight:0}}>
-          <div style={{flex:1,background:"#fff",borderRadius:12,border:"1px solid #e2e8f0",padding:12,overflowY:"auto"}}>
-            <div style={{fontWeight:700,fontSize:12,color:"#0f172a",marginBottom:8}}>Windows 11 Upgrade Checklist</div>
-            {[{req:"TPM 2.0",check:"tpm.msc — must show 'TPM Ready' and Specification Version 2.0",ok:true},{req:"Secure Boot",check:"msinfo32 → Secure Boot State: On",ok:true},{req:"64-bit CPU",check:"systeminfo → must be x64-based processor (most modern CPUs)",ok:true},{req:"4 GB+ RAM",check:"systeminfo → Total Physical Memory: 4,096 MB or more",ok:true},{req:"64 GB+ Disk",check:"dir C:\\ — at least 64 GB free for upgrade",ok:true},{req:"UEFI Firmware",check:"msinfo32 → BIOS Mode: UEFI (not Legacy)",ok:true}].map((r,i)=>(
-              <div key={i} style={{display:"flex",alignItems:"flex-start",gap:7,marginBottom:6,padding:"5px 8px",borderRadius:6,background:"#eff6ff",border:"1px solid #bfdbfe"}}>
-                <div style={{fontWeight:700,fontSize:10,color:"#1d4ed8",width:80,flexShrink:0}}>{r.req}</div>
-                <div style={{fontSize:9,color:"#475569",lineHeight:1.5}}>{r.check}</div>
-              </div>
-            ))}
-          </div>
-          <div style={{flex:1,background:"#fff",borderRadius:12,border:"1px solid #e2e8f0",padding:12,overflowY:"auto"}}>
-            <div style={{fontWeight:700,fontSize:12,color:"#0f172a",marginBottom:8}}>SetupDiag Failure Rules</div>
-            {[{rule:"DriverBlock",code:"0xC1900101",fix:"Find updated driver or remove device"},
-              {rule:"DiskSpaceBlockInDownLevel",code:"—",fix:"Free 64 GB on C: (cleanmgr, Storage Sense)"},
-              {rule:"UninstallOnUpgrade",code:"—",fix:"Uninstall the incompatible app listed"},
-              {rule:"SecureBootEnabled",code:"—",fix:"Enable Secure Boot in BIOS (needs UEFI + GPT)"},
-              {rule:"TPMVersionNotSupported",code:"—",fix:"Enable TPM 2.0 in BIOS, or check CPU supports it"},
-            ].map((s,i)=>(
-              <div key={i} style={{marginBottom:6,padding:"5px 8px",borderRadius:6,background:"#fef3c7",border:"1px solid #fde68a"}}>
-                <div style={{display:"flex",gap:6,marginBottom:2}}>
-                  <span style={{fontFamily:"monospace",fontSize:9,fontWeight:700,color:"#92400e"}}>{s.rule}</span>
-                  {s.code!=="—"&&<span style={{fontFamily:"monospace",fontSize:9,color:"#b45309"}}>{s.code}</span>}
-                </div>
-                <div style={{fontSize:9,color:"#64748b"}}>{s.fix}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
+function ITScenarioQuiz({ moduleId, color, onBack }) {
+  const scenarios = IT_SCENARIOS[moduleId] || [];
+  const [qIdx, setQIdx] = useState(0);
+  const [input, setInput] = useState("");
+  const [submitted, setSubmitted] = useState(false);
+  const [results, setResults] = useState([]);
+  const [showResults, setShowResults] = useState(false);
 
-function ITMod2Sim() {
-  const [faultActive,setFaultActive]=useState(false);
-  const [logType,setLogType]=useState(0);
-  const devices=[
-    {id:"pc",type:"pc",label:"User PC",x:30,y:155,ip:"192.168.1.50",role:"Windows Workstation",color:"#6366f1"},
-    {id:"evt",type:"server",label:"Event Viewer",x:260,y:60,ip:"—",role:"eventvwr.msc",color:"#6366f1"},
-    {id:"wsus",type:"server",label:"Update Srv",x:260,y:160,ip:"192.168.1.20",role:"Windows Update",color:"#6366f1"},
-    {id:"cbs",type:"server",label:"CBS / SFC",x:260,y:260,ip:"—",role:"Component Store",color:"#6366f1"},
-    {id:"cloud",type:"cloud",label:"Microsoft",x:480,y:155,ip:"—",role:"DISM Source",color:"#6366f1"},
-  ];
-  const links=[{from:"pc",to:"evt"},{from:"pc",to:"wsus"},{from:"pc",to:"cbs"},{from:"wsus",to:"cloud"},{from:"cbs",to:"cloud"}];
-  const packets=[{id:"p1",from:"pc",to:"evt",color:"#6366f1",label:"Logs"},{id:"p2",from:"cbs",to:"cloud",color:"#3b82f6",label:"DISM"},{id:"p3",from:"wsus",to:"cloud",color:"#10b981",label:"Update"}];
-  const logs=[
-    {title:"Application Log",id:"ID 1000",desc:"Application crash — faulting module, source app, crash time. First stop for silent app crashes.",cmd:"eventvwr → Windows Logs → Application"},
-    {title:"System Log",id:"ID 41",desc:"Unexpected shutdown/reboot. ID 41 = kernel power failure (no clean shutdown before reboot).",cmd:"eventvwr → Windows Logs → System"},
-    {title:"Setup Log",id:"ID 2",desc:"Windows Update and upgrade events. Shows every update attempt with success/failure codes.",cmd:"eventvwr → Windows Logs → Setup"},
-  ];
-  return (
-    <div style={{display:"flex",flexDirection:"column",gap:10,height:"100%"}}>
-      <div style={{height:340,flexShrink:0}}>
-        <NetSimCanvas devices={devices} links={links} packets={packets} label="Windows Logging Architecture" desc="Event Viewer logs, Windows Update, and SFC/DISM repair flow." color="#6366f1" faultScenarios={IT_FAULT_SCENARIOS[2]} onFaultModeChange={setFaultActive}/>
-      </div>
-      {!faultActive&&(
-        <div style={{flex:1,display:"flex",gap:10,minHeight:0}}>
-          <div style={{flex:1,background:"#fff",borderRadius:12,border:"1px solid #e2e8f0",padding:12,overflowY:"auto"}}>
-            <div style={{fontWeight:700,fontSize:12,color:"#0f172a",marginBottom:8}}>Key Event Logs</div>
-            <div style={{display:"flex",gap:4,marginBottom:9}}>
-              {logs.map((l,i)=><button key={i} onClick={()=>setLogType(i)} style={{flex:1,padding:"4px 0",borderRadius:5,border:`1px solid ${logType===i?"#6366f1":"#e2e8f0"}`,background:logType===i?"#eef2ff":"transparent",color:logType===i?"#4338ca":"#64748b",cursor:"pointer",fontSize:9,fontWeight:logType===i?700:400}}>{l.title.split(" ")[0]}</button>)}
-            </div>
-            <div style={{padding:"9px 10px",borderRadius:8,background:"#eef2ff",border:"1px solid #c7d2fe"}}>
-              <div style={{fontWeight:700,fontSize:11,color:"#4338ca",marginBottom:3}}>{logs[logType].title} — {logs[logType].id}</div>
-              <div style={{fontSize:10,color:"#475569",marginBottom:5,lineHeight:1.6}}>{logs[logType].desc}</div>
-              <div style={{fontFamily:"monospace",fontSize:9,color:"#6366f1",background:"#f8fafc",borderRadius:4,padding:"3px 6px"}}>{logs[logType].cmd}</div>
-            </div>
-            <div style={{marginTop:8,fontWeight:700,fontSize:10,color:"#0f172a",marginBottom:5}}>SFC / DISM Commands</div>
-            {[{cmd:"sfc /scannow",use:"Scan & repair Windows system files. Run as Admin. Takes 10–15 min."},
-              {cmd:"DISM /Online /Cleanup-Image /RestoreHealth",use:"Repair Windows image from Microsoft servers. Run before SFC if image is corrupt."},
-              {cmd:"Get-WindowsUpdateLog",use:"PowerShell — generates WindowsUpdate.log from ETL traces for analysis."},
-            ].map((c,i)=>(
-              <div key={i} style={{marginBottom:5,padding:"5px 8px",borderRadius:6,background:"#f8fafc",border:"1px solid #e2e8f0"}}>
-                <div style={{fontFamily:"monospace",fontSize:9,fontWeight:700,color:"#1e293b",marginBottom:1}}>{c.cmd}</div>
-                <div style={{fontSize:9,color:"#64748b"}}>{c.use}</div>
-              </div>
-            ))}
-          </div>
-          <div style={{flex:1,background:"#fff",borderRadius:12,border:"1px solid #e2e8f0",padding:12,overflowY:"auto"}}>
-            <div style={{fontWeight:700,fontSize:12,color:"#0f172a",marginBottom:8}}>Common Event IDs</div>
-            {[{id:"1000",log:"Application",desc:"Application crash — note faulting module (e.g. ntdll.dll)"},
-              {id:"41",log:"System",desc:"Kernel Power — unexpected reboot (no clean shutdown)"},
-              {id:"6008",log:"System",desc:"Unexpected shutdown — system didn't shut down cleanly"},
-              {id:"7023",log:"System",desc:"Service terminated unexpectedly — note service name"},
-              {id:"7036",log:"System",desc:"Service entered running/stopped state — useful for service issues"},
-              {id:"4625",log:"Security",desc:"Failed logon attempt — check username and logon type"},
-              {id:"4740",log:"Security",desc:"Account locked out — shows which PC triggered the lockout"},
-            ].map((e,i)=>(
-              <div key={i} style={{display:"flex",gap:7,marginBottom:5,alignItems:"flex-start"}}>
-                <div style={{width:28,padding:"1px 0",background:"#eef2ff",border:"1px solid #c7d2fe",borderRadius:4,textAlign:"center",fontSize:9,fontWeight:700,color:"#4338ca",flexShrink:0}}>{e.id}</div>
-                <div>
-                  <div style={{fontSize:9,fontWeight:700,color:"#64748b",marginBottom:1}}>{e.log}</div>
-                  <div style={{fontSize:9,color:"#475569",lineHeight:1.5}}>{e.desc}</div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
+  const current = scenarios[qIdx];
 
-function ITMod3Sim() {
-  const [faultActive,setFaultActive]=useState(false);
-  const devices=[
-    {id:"pc",type:"pc",label:"User PC",x:30,y:155,ip:"—",role:"Hardware + Firmware",color:"#f97316"},
-    {id:"bios",type:"router",label:"BIOS/UEFI",x:270,y:60,ip:"—",role:"Firmware Settings",color:"#f97316"},
-    {id:"tpm",type:"switch",label:"TPM Chip",x:270,y:160,ip:"—",role:"TPM 2.0 Module",color:"#f97316"},
-    {id:"winre",type:"server",label:"WinRE",x:270,y:260,ip:"—",role:"Recovery Environment",color:"#f97316"},
-    {id:"disk",type:"server",label:"Drive (GPT)",x:490,y:155,ip:"—",role:"UEFI Boot Disk",color:"#f97316"},
-  ];
-  const links=[{from:"pc",to:"bios"},{from:"pc",to:"tpm"},{from:"pc",to:"winre"},{from:"bios",to:"disk"},{from:"winre",to:"disk"}];
-  const packets=[{id:"p1",from:"pc",to:"tpm",color:"#f97316",label:"Auth"},{id:"p2",from:"bios",to:"disk",color:"#3b82f6",label:"Boot"},{id:"p3",from:"winre",to:"disk",color:"#10b981",label:"Repair"}];
-  return (
-    <div style={{display:"flex",flexDirection:"column",gap:10,height:"100%"}}>
-      <div style={{height:340,flexShrink:0}}>
-        <NetSimCanvas devices={devices} links={links} packets={packets} label="BIOS/UEFI & Boot Architecture" desc="UEFI firmware, TPM chip, WinRE, and boot disk relationship." color="#f97316" faultScenarios={IT_FAULT_SCENARIOS[3]} onFaultModeChange={setFaultActive}/>
-      </div>
-      {!faultActive&&(
-        <div style={{flex:1,display:"flex",gap:10,minHeight:0}}>
-          <div style={{flex:1,background:"#fff",borderRadius:12,border:"1px solid #e2e8f0",padding:12,overflowY:"auto"}}>
-            <div style={{fontWeight:700,fontSize:12,color:"#0f172a",marginBottom:8}}>BIOS/UEFI Settings for Windows 11</div>
-            {[{s:"Boot Mode",val:"UEFI (not Legacy/CSM). UEFI is required for Secure Boot and GPT disk.",tool:"msinfo32 → BIOS Mode"},
-              {s:"Secure Boot",val:"Enabled. Only allows trusted boot loaders. Blocks rootkits and bootkits.",tool:"msinfo32 → Secure Boot State"},
-              {s:"TPM",val:"Enabled as fTPM (AMD) or PTT (Intel). Must show TPM Spec 2.0 in tpm.msc.",tool:"tpm.msc"},
-              {s:"Boot Order",val:"Boot from SSD/HDD first for normal operation. Move USB to top for recovery.",tool:"BIOS Boot tab"},
-              {s:"VT-x / AMD-V",val:"Virtualisation must be enabled for Hyper-V, WSL2, and Android Subsystem.",tool:"BIOS → CPU settings"},
-            ].map((s,i)=>(
-              <div key={i} style={{marginBottom:6,padding:"6px 8px",borderRadius:7,background:"#fff7ed",border:"1px solid #fed7aa"}}>
-                <div style={{display:"flex",justifyContent:"space-between",marginBottom:2}}>
-                  <span style={{fontWeight:700,fontSize:10,color:"#c2410c"}}>{s.s}</span>
-                  <span style={{fontSize:9,fontFamily:"monospace",color:"#94a3b8"}}>{s.tool}</span>
-                </div>
-                <div style={{fontSize:9,color:"#64748b"}}>{s.val}</div>
-              </div>
-            ))}
-          </div>
-          <div style={{flex:1,background:"#fff",borderRadius:12,border:"1px solid #e2e8f0",padding:12,overflowY:"auto"}}>
-            <div style={{fontWeight:700,fontSize:12,color:"#0f172a",marginBottom:8}}>WinRE Tools</div>
-            {[{t:"Startup Repair",use:"Automatically fixes boot files, BCD, and bootloader. First tool to try when machine won't boot."},
-              {t:"System Restore",use:"Roll back Windows to a previous restore point. Does not affect personal files. Great for driver/update issues."},
-              {t:"Uninstall Updates",use:"Remove the last Quality or Feature update. Use when a recent update caused instability."},
-              {t:"Command Prompt",use:"Full admin shell for: bootrec /fixmbr, bootrec /fixboot, bootrec /rebuildbcd, chkdsk C: /f /r"},
-              {t:"Reset this PC",use:"Reinstall Windows keeping or removing files. Last resort before full rebuild."},
-            ].map((t,i)=>(
-              <div key={i} style={{marginBottom:6,padding:"6px 8px",borderRadius:7,background:"#f8fafc",border:"1px solid #e2e8f0"}}>
-                <div style={{fontWeight:700,fontSize:10,color:"#1e293b",marginBottom:2}}>{t.t}</div>
-                <div style={{fontSize:9,color:"#64748b"}}>{t.use}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
+  const checkAnswer = (answer, keywords) => {
+    const lower = answer.toLowerCase();
+    return keywords.filter(k => lower.includes(k.toLowerCase())).length >= 2;
+  };
 
-function ITMod4Sim() {
-  const [faultActive,setFaultActive]=useState(false);
-  const devices=[
-    {id:"it",type:"laptop",label:"IT Agent",x:30,y:155,ip:"10.0.0.5",role:"IT Support Engineer",color:"#f43f5e"},
-    {id:"atera",type:"server",label:"Atera RMM",x:260,y:60,ip:"cloud",role:"Remote Monitoring",color:"#f43f5e"},
-    {id:"anydesk",type:"cloud",label:"AnyDesk",x:260,y:255,ip:"relay",role:"Cloud Relay",color:"#f43f5e"},
-    {id:"rdp",type:"router",label:"RDP / VPN",x:480,y:60,ip:"TCP 3389",role:"Direct RDP / VPN",color:"#f43f5e"},
-    {id:"user",type:"pc",label:"User PC",x:480,y:255,ip:"192.168.1.50",role:"Remote Workstation",color:"#f43f5e"},
-  ];
-  const links=[{from:"it",to:"atera"},{from:"atera",to:"user"},{from:"it",to:"anydesk"},{from:"anydesk",to:"user"},{from:"it",to:"rdp"},{from:"rdp",to:"user"}];
-  const packets=[{id:"p1",from:"it",to:"atera",color:"#f43f5e",label:"RMM"},{id:"p2",from:"it",to:"anydesk",color:"#a855f7",label:"AD"},{id:"p3",from:"it",to:"rdp",color:"#3b82f6",label:"RDP"}];
-  return (
-    <div style={{display:"flex",flexDirection:"column",gap:10,height:"100%"}}>
-      <div style={{height:340,flexShrink:0}}>
-        <NetSimCanvas devices={devices} links={links} packets={packets} label="Remote Support Pathways" desc="Atera RMM, AnyDesk cloud relay, and direct RDP connection paths." color="#f43f5e" faultScenarios={IT_FAULT_SCENARIOS[4]} onFaultModeChange={setFaultActive}/>
-      </div>
-      {!faultActive&&(
-        <div style={{flex:1,display:"flex",gap:10,minHeight:0}}>
-          <div style={{flex:1,background:"#fff",borderRadius:12,border:"1px solid #e2e8f0",padding:12,overflowY:"auto"}}>
-            <div style={{fontWeight:700,fontSize:12,color:"#0f172a",marginBottom:8}}>Remote Tool Comparison</div>
-            {[{tool:"Atera RMM",port:"HTTPS 443",how:"Cloud agent on device reports to Atera dashboard. Launch Splashtop from within Atera.",use:"Primary tool — device monitoring, scripting, remote sessions"},
-              {tool:"AnyDesk",port:"TCP 443 / 7070",how:"Both ends connect outbound to AnyDesk relay. Works through NAT & home routers.",use:"Best for home workers or when Atera is unavailable"},
-              {tool:"RDP",port:"TCP 3389",how:"Direct TCP connection to Windows Remote Desktop service. Requires firewall rule.",use:"Fast, built-in — best for office LAN or VPN sessions"},
-              {tool:"Splashtop",port:"TCP 443",how:"Launched from within Atera. Cloud relay like AnyDesk. Very low latency.",use:"Used via Atera — primary remote session tool at Pace"},
-            ].map((t,i)=>(
-              <div key={i} style={{marginBottom:7,padding:"6px 9px",borderRadius:8,background:"#fff1f2",border:"1px solid #fecdd3"}}>
-                <div style={{display:"flex",justifyContent:"space-between",marginBottom:2}}>
-                  <span style={{fontWeight:700,fontSize:11,color:"#f43f5e"}}>{t.tool}</span>
-                  <span style={{fontFamily:"monospace",fontSize:9,color:"#94a3b8"}}>{t.port}</span>
-                </div>
-                <div style={{fontSize:9,color:"#64748b",marginBottom:2}}>{t.how}</div>
-                <div style={{fontSize:9,fontWeight:600,color:"#be123c"}}>{t.use}</div>
-              </div>
-            ))}
-          </div>
-          <div style={{flex:1,background:"#fff",borderRadius:12,border:"1px solid #e2e8f0",padding:12,overflowY:"auto"}}>
-            <div style={{fontWeight:700,fontSize:12,color:"#0f172a",marginBottom:8}}>Remote Session Checklist</div>
-            {[{n:"1",s:"Find device in Atera — note OS version, RAM, last seen, online status before connecting"},
-              {n:"2",s:"Launch Splashtop from Atera (preferred) or AnyDesk as fallback if Atera agent is offline"},
-              {n:"3",s:"Ask user to stay at their desk — you may need them to dismiss UAC prompts"},
-              {n:"4",s:"Run your diagnostics (ipconfig, Event Viewer, Task Manager, CrystalDiskInfo)"},
-              {n:"5",s:"Apply fix. Verify with the user before disconnecting — test the issue is resolved"},
-              {n:"6",s:"Close session. Update the Autotask ticket with: actions taken, outcome, and next steps"},
-            ].map((s,i)=>(
-              <div key={i} style={{display:"flex",gap:6,marginBottom:5,alignItems:"flex-start"}}>
-                <div style={{width:18,height:18,borderRadius:"50%",background:"#f43f5e",color:"#fff",fontSize:9,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>{s.n}</div>
-                <div style={{fontSize:9,color:"#475569",lineHeight:1.5}}>{s.s}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
+  const handleSubmit = () => {
+    if (!input.trim()) return;
+    const correct = checkAnswer(input, current.keywords);
+    setResults(prev => [...prev, { correct, topic: current.topic, correctAnswer: current.correctAnswer }]);
+    setSubmitted(true);
+  };
 
-function ITMod5Sim() {
-  const [faultActive,setFaultActive]=useState(false);
-  const devices=[
-    {id:"user",type:"pc",label:"User PC",x:30,y:80,ip:"192.168.1.50",role:"End User",color:"#14b8a6"},
-    {id:"agent",type:"laptop",label:"IT Agent",x:30,y:240,ip:"10.0.0.5",role:"Support Engineer",color:"#14b8a6"},
-    {id:"autotask",type:"server",label:"Autotask",x:290,y:80,ip:"cloud",role:"PSA / Ticketing",color:"#14b8a6"},
-    {id:"atera",type:"server",label:"Atera",x:290,y:240,ip:"cloud",role:"RMM Dashboard",color:"#14b8a6"},
-    {id:"mgr",type:"laptop",label:"Manager",x:510,y:160,ip:"—",role:"Kurt / Escalation",color:"#14b8a6"},
-  ];
-  const links=[{from:"user",to:"autotask"},{from:"agent",to:"autotask"},{from:"agent",to:"atera"},{from:"atera",to:"user"},{from:"autotask",to:"mgr"},{from:"agent",to:"mgr"}];
-  const packets=[{id:"p1",from:"user",to:"autotask",color:"#14b8a6",label:"Ticket"},{id:"p2",from:"agent",to:"atera",color:"#3b82f6",label:"Connect"},{id:"p3",from:"autotask",to:"mgr",color:"#f97316",label:"Escalate"}];
-  return (
-    <div style={{display:"flex",flexDirection:"column",gap:10,height:"100%"}}>
-      <div style={{height:340,flexShrink:0}}>
-        <NetSimCanvas devices={devices} links={links} packets={packets} label="Help Desk Ticket Lifecycle" desc="User → ticket creation → agent action via Atera → escalation to manager." color="#14b8a6" faultScenarios={IT_FAULT_SCENARIOS[5]} onFaultModeChange={setFaultActive}/>
-      </div>
-      {!faultActive&&(
-        <div style={{flex:1,display:"flex",gap:10,minHeight:0}}>
-          <div style={{flex:1,background:"#fff",borderRadius:12,border:"1px solid #e2e8f0",padding:12,overflowY:"auto"}}>
-            <div style={{fontWeight:700,fontSize:12,color:"#0f172a",marginBottom:8}}>Autotask Priority Matrix</div>
-            {[{p:"P1 Critical",color:"#ef4444",eg:"Site-wide outage, server down, all users affected",sla:"Respond: 15 min"},
-              {p:"P2 High",color:"#f97316",eg:"Department offline, exec affected, major service down",sla:"Respond: 1 hr"},
-              {p:"P3 Medium",color:"#f59e0b",eg:"Single user affected, workaround exists",sla:"Respond: 4 hrs"},
-              {p:"P4 Low",color:"#10b981",eg:"Minor issue, cosmetic, non-urgent request",sla:"Respond: 2 days"},
-            ].map((p,i)=>(
-              <div key={i} style={{display:"flex",gap:7,marginBottom:6,padding:"5px 8px",borderRadius:6,background:`${p.color}08`,border:`1px solid ${p.color}25`,alignItems:"center"}}>
-                <div style={{width:74,fontWeight:700,fontSize:9,color:p.color,flexShrink:0}}>{p.p}</div>
-                <div style={{flex:1,fontSize:9,color:"#475569"}}>{p.eg}</div>
-                <div style={{fontSize:9,color:"#94a3b8",whiteSpace:"nowrap"}}>{p.sla}</div>
-              </div>
-            ))}
-            <div style={{marginTop:8,fontWeight:700,fontSize:10,color:"#0f172a",marginBottom:5}}>Ticket Types</div>
-            {[{t:"Incident",d:"Unplanned outage or degradation — fix ASAP"},
-              {t:"Service Request",d:"Planned work — software install, account setup"},
-              {t:"Change",d:"Infrastructure modification — planned, approved, scheduled"},
-            ].map((t,i)=>(
-              <div key={i} style={{display:"flex",gap:6,marginBottom:4,alignItems:"flex-start"}}>
-                <div style={{width:60,fontSize:9,fontWeight:700,color:"#14b8a6",flexShrink:0}}>{t.t}</div>
-                <div style={{fontSize:9,color:"#64748b"}}>{t.d}</div>
-              </div>
-            ))}
+  const handleNext = () => {
+    if (qIdx === scenarios.length - 1) { setShowResults(true); }
+    else { setQIdx(q => q + 1); setInput(""); setSubmitted(false); }
+  };
+
+  const handleReset = () => { setQIdx(0); setInput(""); setSubmitted(false); setResults([]); setShowResults(false); };
+
+  if (showResults) {
+    const score = results.filter(r => r.correct).length;
+    const wrongTopics = [...new Set(results.filter(r => !r.correct).map(r => r.topic))];
+    const rating = score >= 9 ? "Excellent" : score >= 7 ? "Good" : score >= 5 ? "Developing" : "Needs Review";
+    const ratingColor = score >= 9 ? "#10b981" : score >= 7 ? "#3b82f6" : score >= 5 ? "#f59e0b" : "#ef4444";
+    return (
+      <div style={{height:"100%",overflowY:"auto",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"flex-start",padding:"32px 20px",fontFamily:"system-ui,sans-serif"}}>
+        <div style={{maxWidth:560,width:"100%"}}>
+          <div style={{textAlign:"center",marginBottom:28}}>
+            <div style={{fontSize:"3.5rem",fontWeight:900,color:score>=7?"#10b981":"#f59e0b",lineHeight:1}}>{score}<span style={{fontSize:"1.5rem",color:"#94a3b8"}}>/10</span></div>
+            <div style={{marginTop:6,display:"inline-block",padding:"4px 16px",borderRadius:20,background:`${ratingColor}18`,border:`1px solid ${ratingColor}40`,color:ratingColor,fontWeight:700,fontSize:"0.95rem"}}>{rating}</div>
+            <div style={{marginTop:10,color:"#64748b",fontSize:"0.85rem"}}>Module {moduleId} complete</div>
           </div>
-          <div style={{flex:1,background:"#fff",borderRadius:12,border:"1px solid #e2e8f0",padding:12,overflowY:"auto"}}>
-            <div style={{fontWeight:700,fontSize:12,color:"#0f172a",marginBottom:8}}>Perfect Escalation Note</div>
-            <div style={{padding:"9px 10px",borderRadius:8,background:"#f0fdfa",border:"1px solid #99f6e4",marginBottom:8}}>
-              <div style={{fontWeight:700,fontSize:10,color:"#0f766e",marginBottom:4}}>What to include:</div>
-              {["Machine name / asset tag (e.g. LAPTOP-047)","Exact error code (e.g. 0xC1900101 — DriverBlock)","SetupDiag output / Event Viewer finding","Every step you tried and the result","Why you are escalating (what you can't resolve)","Any time pressure or user impact"].map((l,i)=>(
-                <div key={i} style={{display:"flex",gap:5,marginBottom:3,fontSize:9,color:"#475569"}}>
-                  <span style={{color:"#14b8a6",fontWeight:700}}>✓</span>{l}
+          <div style={{background:"#fff",border:"1px solid #e2e8f0",borderRadius:16,padding:20,marginBottom:16}}>
+            <div style={{fontWeight:700,fontSize:"0.85rem",color:"#0f172a",marginBottom:12}}>Score Breakdown</div>
+            <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+              {results.map((r,i)=>(
+                <div key={i} style={{width:32,height:32,borderRadius:8,background:r.correct?`${color}18`:"#fef2f2",border:`1px solid ${r.correct?color+"40":"#fecaca"}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700,color:r.correct?color:"#ef4444"}}>
+                  {r.correct?"✓":"✗"}
                 </div>
               ))}
             </div>
-            <div style={{fontWeight:700,fontSize:10,color:"#0f172a",marginBottom:5}}>Before Closing a Ticket</div>
-            {["Fix applied and confirmed working","User has verified the issue is resolved","Root cause documented in Resolution note","All actions recorded in Work Detail","Machine name, date, error code all present"].map((l,i)=>(
-              <div key={i} style={{display:"flex",gap:5,marginBottom:3,fontSize:9,color:"#475569"}}>
-                <span style={{color:"#14b8a6",fontWeight:700}}>□</span>{l}
-              </div>
-            ))}
+          </div>
+          {wrongTopics.length > 0 && (
+            <div style={{background:"#fff",border:"1px solid #e2e8f0",borderRadius:16,padding:20,marginBottom:16}}>
+              <div style={{fontWeight:700,fontSize:"0.85rem",color:"#0f172a",marginBottom:10}}>Areas of Development</div>
+              <p style={{fontSize:"0.8rem",color:"#64748b",marginBottom:12,lineHeight:1.5}}>Focus on these topics before your next assessment:</p>
+              {wrongTopics.map((t,i)=>(
+                <div key={i} style={{display:"flex",alignItems:"center",gap:8,marginBottom:7,padding:"8px 12px",borderRadius:9,background:"#fef2f2",border:"1px solid #fecaca"}}>
+                  <div style={{width:8,height:8,borderRadius:"50%",background:"#ef4444",flexShrink:0}}/>
+                  <div style={{fontSize:"0.82rem",color:"#1e293b",fontWeight:600}}>{t}</div>
+                </div>
+              ))}
+            </div>
+          )}
+          {wrongTopics.length === 0 && (
+            <div style={{background:"#f0fdf4",border:"1px solid #bbf7d0",borderRadius:16,padding:16,marginBottom:16,textAlign:"center"}}>
+              <div style={{fontSize:"1.5rem",marginBottom:4}}>🎉</div>
+              <div style={{fontWeight:700,color:"#166534",fontSize:"0.9rem"}}>Perfect score — no areas of development!</div>
+            </div>
+          )}
+          <div style={{display:"flex",gap:10}}>
+            <button onClick={handleReset} style={{flex:1,padding:12,borderRadius:10,background:`linear-gradient(135deg,${color},${color}cc)`,color:"#fff",fontWeight:700,border:"none",cursor:"pointer",fontSize:"0.9rem"}}>Try Again</button>
+            <button onClick={onBack} style={{flex:1,padding:12,borderRadius:10,background:"#f1f5f9",color:"#475569",fontWeight:600,border:"1px solid #e2e8f0",cursor:"pointer",fontSize:"0.9rem"}}>← Back to Hub</button>
           </div>
         </div>
-      )}
-    </div>
-  );
-}
-
-function ITMod6Sim() {
-  const [faultActive,setFaultActive]=useState(false);
-  const [step,setStep]=useState(0);
-  const devices=[
-    {id:"pc",type:"pc",label:"User PC",x:30,y:155,ip:"192.168.1.50",role:"Workstation",color:"#64748b"},
-    {id:"print",type:"server",label:"Print Srv",x:260,y:60,ip:"192.168.1.80",role:"Print Spooler",color:"#64748b"},
-    {id:"file",type:"server",label:"File Srv",x:260,y:160,ip:"10.10.1.50",role:"Shared Drives",color:"#64748b"},
-    {id:"ad",type:"server",label:"AD / DC",x:260,y:260,ip:"192.168.1.1",role:"Active Directory",color:"#64748b"},
-    {id:"atera",type:"cloud",label:"Atera",x:480,y:155,ip:"cloud",role:"RMM Monitoring",color:"#64748b"},
-  ];
-  const links=[{from:"pc",to:"print"},{from:"pc",to:"file"},{from:"pc",to:"ad"},{from:"atera",to:"pc"},{from:"atera",to:"print"}];
-  const packets=[{id:"p1",from:"pc",to:"file",color:"#64748b",label:"SMB"},{id:"p2",from:"pc",to:"print",color:"#f97316",label:"Print"},{id:"p3",from:"atera",to:"pc",color:"#3b82f6",label:"Mon"}];
-  const steps=[
-    {n:"1",title:"Identify the Problem",desc:"Get exact symptoms. What error message? When did it start? Who is affected — one user or many? Can you reproduce it? Gather this BEFORE touching anything.",cmd:"Ask the user. Check Atera for alerts. Check Event Viewer."},
-    {n:"2",title:"Establish a Theory",desc:"What is the most likely cause? Think bottom-up (Physical → Network → OS → Application). What changed recently? A Windows Update? A user action? Don't guess — use the evidence.",cmd:"Review Event Viewer, ping the device, check services."},
-    {n:"3",title:"Test the Theory",desc:"Run targeted diagnostics to confirm or rule out your theory. Ping to test connectivity. services.msc to test services. Event Viewer for app crashes. CrystalDiskInfo for disk health.",cmd:"ping, ipconfig, services.msc, eventvwr, CrystalDiskInfo"},
-    {n:"4",title:"Implement a Solution",desc:"Apply the fix — one change at a time. Restart the Print Spooler. Delete the corrupt OST file. Uninstall the driver. Don't change multiple things simultaneously — you won't know what fixed it.",cmd:"Apply your fix. One change at a time."},
-    {n:"5",title:"Verify & Document",desc:"Confirm the fix works — test with the user, not just yourself. Then document: root cause, actions taken, resolution. Update the Autotask ticket. Close only after user confirmation.",cmd:"User confirms fix. Close ticket with full resolution note."},
-  ];
-  return (
-    <div style={{display:"flex",flexDirection:"column",gap:10,height:"100%"}}>
-      <div style={{height:340,flexShrink:0}}>
-        <NetSimCanvas devices={devices} links={links} packets={packets} label="IT Support Infrastructure" desc="Common IT assets — printer, file server, Active Directory, monitored via Atera." color="#64748b" faultScenarios={IT_FAULT_SCENARIOS[6]} onFaultModeChange={setFaultActive}/>
       </div>
-      {!faultActive&&(
-        <div style={{flex:1,display:"flex",gap:10,minHeight:0}}>
-          <div style={{flex:1,background:"#fff",borderRadius:12,border:"1px solid #e2e8f0",padding:12,overflowY:"auto"}}>
-            <div style={{fontWeight:700,fontSize:12,color:"#0f172a",marginBottom:8}}>5-Step Troubleshooting Methodology</div>
-            <div style={{display:"flex",gap:4,marginBottom:10}}>
-              {steps.map((s,i)=><button key={i} onClick={()=>setStep(i)} style={{flex:1,padding:"4px 0",borderRadius:5,border:`1px solid ${step===i?"#475569":"#e2e8f0"}`,background:step===i?"#f8fafc":"transparent",color:step===i?"#1e293b":"#94a3b8",cursor:"pointer",fontSize:10,fontWeight:step===i?700:400}}>{s.n}</button>)}
-            </div>
-            <div style={{padding:"10px 12px",borderRadius:9,background:"#f8fafc",border:"1px solid #e2e8f0",marginBottom:8}}>
-              <div style={{fontWeight:700,fontSize:11,color:"#0f172a",marginBottom:4}}>Step {steps[step].n}: {steps[step].title}</div>
-              <div style={{fontSize:10,color:"#475569",lineHeight:1.7,marginBottom:6}}>{steps[step].desc}</div>
-              <div style={{fontFamily:"monospace",fontSize:9,color:"#64748b",background:"#fff",borderRadius:4,padding:"3px 6px",border:"1px solid #e2e8f0"}}>{steps[step].cmd}</div>
-            </div>
+    );
+  }
+
+  const lastResult = submitted ? results[results.length - 1] : null;
+
+  return (
+    <div style={{height:"100%",display:"flex",fontFamily:"system-ui,sans-serif",minHeight:0}}>
+      {/* Left: Question panel */}
+      <div style={{flex:3,padding:20,overflowY:"auto",display:"flex",flexDirection:"column",gap:14,borderRight:"1px solid #e2e8f0"}}>
+        {/* Progress */}
+        <div style={{display:"flex",alignItems:"center",gap:10}}>
+          <div style={{fontSize:"0.78rem",fontWeight:700,color:color}}>Question {qIdx+1} of {scenarios.length}</div>
+          <div style={{flex:1,height:5,borderRadius:3,background:"#f1f5f9",overflow:"hidden"}}>
+            <div style={{height:"100%",borderRadius:3,background:color,width:`${((qIdx+(submitted?1:0))/scenarios.length)*100}%`,transition:"width 0.3s"}}/>
           </div>
-          <div style={{flex:1,background:"#fff",borderRadius:12,border:"1px solid #e2e8f0",padding:12,overflowY:"auto"}}>
-            <div style={{fontWeight:700,fontSize:12,color:"#0f172a",marginBottom:8}}>Quick Reference Commands</div>
-            {[{cmd:"ipconfig /all",use:"Full IP config — adapter, DHCP, DNS, gateway"},
-              {cmd:"ping <IP>",use:"Test Layer 3 connectivity to any host"},
-              {cmd:"nslookup <domain>",use:"Test DNS resolution for a domain name"},
-              {cmd:"tracert <IP>",use:"Trace route — identify where packets stop"},
-              {cmd:"services.msc",use:"View and manage Windows services (start/stop)"},
-              {cmd:"eventvwr.msc",use:"Event Viewer — Application, System, Security logs"},
-              {cmd:"msinfo32",use:"System info — OS, BIOS, Secure Boot state"},
-              {cmd:"tpm.msc",use:"TPM Management — check TPM version and status"},
-              {cmd:"cleanmgr",use:"Disk Cleanup — free space for Windows 11 upgrade"},
-            ].map((c,i)=>(
-              <div key={i} style={{display:"flex",gap:7,marginBottom:4,alignItems:"flex-start"}}>
-                <div style={{fontFamily:"monospace",fontSize:9,fontWeight:700,color:"#1e293b",background:"#f1f5f9",borderRadius:4,padding:"2px 5px",flexShrink:0,whiteSpace:"nowrap"}}>{c.cmd}</div>
-                <div style={{fontSize:9,color:"#64748b",lineHeight:1.5}}>{c.use}</div>
-              </div>
-            ))}
+          <div style={{fontSize:"0.75rem",color:"#94a3b8"}}>{results.filter(r=>r.correct).length}/{results.length} correct</div>
+        </div>
+        {/* Scenario */}
+        <div style={{background:"#fff",border:`1px solid ${color}30`,borderLeft:`4px solid ${color}`,borderRadius:"0 12px 12px 0",padding:"14px 16px"}}>
+          <div style={{fontSize:"0.72rem",fontWeight:700,color:color,textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:7}}>Scenario</div>
+          <div style={{fontSize:"0.9rem",color:"#1e293b",lineHeight:1.7}}>{current.question}</div>
+        </div>
+        {/* Answer area */}
+        <div>
+          <label style={{fontSize:"0.78rem",fontWeight:600,color:"#475569",display:"block",marginBottom:6}}>Your Answer</label>
+          <textarea
+            value={input} onChange={e=>setInput(e.target.value)}
+            disabled={submitted}
+            placeholder="Type your answer here — be specific, use the correct tool names and commands..."
+            rows={5}
+            style={{width:"100%",padding:"11px 14px",borderRadius:10,border:`1px solid ${submitted?(lastResult?.correct?"#86efac":"#fca5a5"):"#e2e8f0"}`,background:submitted?(lastResult?.correct?"#f0fdf4":"#fef2f2"):"#fff",fontSize:"0.88rem",color:"#1e293b",resize:"vertical",outline:"none",boxSizing:"border-box",fontFamily:"inherit",lineHeight:1.6}}
+          />
+        </div>
+        {/* Buttons */}
+        <div style={{display:"flex",gap:10}}>
+          {!submitted ? (
+            <button onClick={handleSubmit} disabled={!input.trim()} style={{padding:"10px 24px",borderRadius:10,background:input.trim()?`linear-gradient(135deg,${color},${color}cc)`:"#e2e8f0",color:input.trim()?"#fff":"#94a3b8",fontWeight:700,border:"none",cursor:input.trim()?"pointer":"default",fontSize:"0.9rem"}}>
+              Submit Answer
+            </button>
+          ) : (
+            <button onClick={handleNext} style={{padding:"10px 24px",borderRadius:10,background:`linear-gradient(135deg,${color},${color}cc)`,color:"#fff",fontWeight:700,border:"none",cursor:"pointer",fontSize:"0.9rem"}}>
+              {qIdx === scenarios.length - 1 ? "See Results →" : "Next Question →"}
+            </button>
+          )}
+          <button onClick={onBack} style={{padding:"10px 18px",borderRadius:10,background:"transparent",color:"#94a3b8",fontWeight:600,border:"1px solid #e2e8f0",cursor:"pointer",fontSize:"0.85rem"}}>← Hub</button>
+        </div>
+      </div>
+      {/* Right: Feedback panel */}
+      <div style={{flex:2,padding:18,overflowY:"auto",background:"#f8fafc",display:"flex",flexDirection:"column",gap:12}}>
+        {/* Running score */}
+        <div style={{background:"#fff",border:"1px solid #e2e8f0",borderRadius:12,padding:"10px 14px"}}>
+          <div style={{fontSize:"0.75rem",fontWeight:700,color:"#64748b",marginBottom:7,textTransform:"uppercase",letterSpacing:"0.04em"}}>Progress</div>
+          <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
+            {scenarios.map((_,i)=>{
+              const res = results[i];
+              return (
+                <div key={i} style={{width:26,height:26,borderRadius:6,border:`1px solid ${i===qIdx?color:(res?( res.correct?color+"60":"#fca5a5"):"#e2e8f0")}`,background:i===qIdx?`${color}18`:(res?(res.correct?`${color}18`:"#fef2f2"):"transparent"),display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,fontWeight:700,color:i===qIdx?color:(res?(res.correct?color:"#ef4444"):"#cbd5e1")}}>
+                  {res ? (res.correct?"✓":"✗") : (i+1)}
+                </div>
+              );
+            })}
           </div>
         </div>
-      )}
+        {/* Feedback */}
+        {submitted && lastResult ? (
+          <div style={{background:"#fff",border:`1px solid ${lastResult.correct?"#86efac":"#fca5a5"}`,borderRadius:12,padding:14,flex:1}}>
+            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10}}>
+              <div style={{width:28,height:28,borderRadius:8,background:lastResult.correct?"#f0fdf4":"#fef2f2",border:`1px solid ${lastResult.correct?"#86efac":"#fca5a5"}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,fontWeight:800,color:lastResult.correct?"#10b981":"#ef4444"}}>
+                {lastResult.correct?"✓":"✗"}
+              </div>
+              <div style={{fontWeight:700,fontSize:"0.9rem",color:lastResult.correct?"#166534":"#991b1b"}}>
+                {lastResult.correct?"Correct!":"Not quite — see below"}
+              </div>
+            </div>
+            <div style={{fontSize:"0.72rem",fontWeight:700,color:"#94a3b8",textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:6}}>Model Answer</div>
+            <div style={{fontSize:"0.82rem",color:"#374151",lineHeight:1.75,background:"#f8fafc",borderRadius:8,padding:"10px 12px",border:"1px solid #e2e8f0"}}>{lastResult.correctAnswer}</div>
+            <div style={{marginTop:10,padding:"7px 10px",borderRadius:7,background:`${color}10`,border:`1px solid ${color}30`}}>
+              <span style={{fontSize:"0.72rem",fontWeight:700,color:color}}>Topic: </span>
+              <span style={{fontSize:"0.72rem",color:"#475569"}}>{current.topic}</span>
+            </div>
+          </div>
+        ) : (
+          <div style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",color:"#cbd5e1",textAlign:"center",gap:8,padding:20}}>
+            <div style={{fontSize:"2.5rem",opacity:0.4}}>💬</div>
+            <div style={{fontSize:"0.85rem",fontWeight:600}}>Submit your answer</div>
+            <div style={{fontSize:"0.78rem"}}>Feedback and the model answer will appear here</div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
-
-const IT_MODULE_SIMS = {1:ITMod1Sim,2:ITMod2Sim,3:ITMod3Sim,4:ITMod4Sim,5:ITMod5Sim,6:ITMod6Sim};
 
 // ── LOGIN ──
 function LoginScreen({ onLogin, portal="networking", onBack }) {
@@ -2083,7 +1765,6 @@ function ITApp({ onPortalReset }) {
   const signOut=()=>{localStorage.removeItem("it_auth");localStorage.removeItem("it_name");setLoggedIn(false);setScreen("name");setName("");onPortalReset();};
   const openModule=(mod)=>{ setActiveModule(mod.id); setScreen("module"); };
   const mod=IT_MODULES.find(m=>m.id===activeModule);
-  const SimComponent=activeModule?IT_MODULE_SIMS[activeModule]:null;
 
   if(screen==="name") return <NameScreen onEnter={n=>{localStorage.setItem("it_name",n);setName(n);setScreen("hub");}} onSignOut={signOut} accent="#14b8a6" accent2="#0d9488"/>;
 
@@ -2096,7 +1777,7 @@ function ITApp({ onPortalReset }) {
       </div>
       <div style={{maxWidth:740,margin:"0 auto",padding:"24px 16px"}}>
         <h2 style={{fontSize:"1.3rem",fontWeight:700,color:"#0f172a",margin:"0 0 5px"}}>Choose a Module, {name}</h2>
-        <p style={{color:"#64748b",fontSize:"0.9rem",marginBottom:20}}>Each module covers core IT support skills with interactive fault scenarios.</p>
+        <p style={{color:"#64748b",fontSize:"0.9rem",marginBottom:20}}>Each module has 10 scenario-based questions. Type your answer and get instant feedback.</p>
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(210px,1fr))",gap:14}}>
           {IT_MODULES.map(m=>(
             <div key={m.id} onClick={()=>openModule(m)}
@@ -2106,7 +1787,7 @@ function ITApp({ onPortalReset }) {
               <div style={{width:40,height:40,borderRadius:12,background:`${m.color}18`,border:`1px solid ${m.color}40`,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:800,fontSize:13,color:m.color,marginBottom:10}}>M{m.id}</div>
               <div style={{fontWeight:700,fontSize:"0.9rem",color:"#0f172a",marginBottom:3}}>{m.title}</div>
               <div style={{fontSize:"0.78rem",color:"#64748b",marginBottom:10}}>{m.desc}</div>
-              <span style={{fontSize:9,background:`${m.color}15`,color:m.color,borderRadius:4,padding:"2px 6px",fontWeight:600}}>SCENARIOS</span>
+              <span style={{fontSize:9,background:`${m.color}15`,color:m.color,borderRadius:4,padding:"2px 6px",fontWeight:600}}>10 SCENARIOS</span>
             </div>
           ))}
         </div>
@@ -2114,18 +1795,16 @@ function ITApp({ onPortalReset }) {
     </div>
   );
 
+  // Module screen — full-width scenario quiz
   return (
     <div style={{height:"100vh",display:"flex",flexDirection:"column",fontFamily:"system-ui,sans-serif",background:"#f8fafc"}}>
       <div style={{background:mod?`linear-gradient(135deg,${mod.color}e0,${mod.color}90)`:"linear-gradient(135deg,#0f172a,#134e4a)",padding:"10px 16px",display:"flex",alignItems:"center",gap:10,flexShrink:0}}>
         <button onClick={()=>setScreen("hub")} style={{background:"rgba(255,255,255,0.2)",border:"none",color:"#fff",padding:"6px 12px",borderRadius:8,cursor:"pointer",fontWeight:600,fontSize:"0.8rem"}}>← Hub</button>
         {mod&&<div style={{fontWeight:700,color:"#fff",fontSize:"0.95rem"}}>Module {mod.id}: {mod.title}</div>}
+        <div style={{marginLeft:"auto",color:"rgba(255,255,255,0.6)",fontSize:"0.75rem"}}>10 scenario questions</div>
       </div>
-      <div style={{flex:1,overflow:"hidden",display:"flex"}}>
-        <div style={{flex:1,overflow:"auto",padding:14,display:"flex",flexDirection:"column"}}>{SimComponent&&<SimComponent/>}</div>
-        <div style={{width:290,background:"#fff",borderLeft:"1px solid #e2e8f0",overflow:"auto",padding:18,flexShrink:0}}>
-          {mod&&(<div style={{display:"flex",alignItems:"center",gap:8,marginBottom:16,paddingBottom:12,borderBottom:"1px solid #f1f5f9"}}><div style={{width:10,height:10,borderRadius:"50%",background:mod.color,flexShrink:0}}/><div style={{fontWeight:700,color:"#0f172a",fontSize:13}}>{mod.title}</div></div>)}
-          {activeModule&&<InfoPanel moduleId={activeModule} color={mod?.color||"#14b8a6"} infoData={IT_MODULE_INFO}/>}
-        </div>
+      <div style={{flex:1,overflow:"hidden"}}>
+        {activeModule&&mod&&<ITScenarioQuiz moduleId={activeModule} color={mod.color} onBack={()=>setScreen("hub")}/>}
       </div>
     </div>
   );
