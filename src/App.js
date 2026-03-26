@@ -2011,15 +2011,15 @@ function NameScreen({ onEnter, onSignOut, accent="#6366f1", accent2="#8b5cf6" })
 }
 
 // ── NETWORKING APP ──
-function NetworkingApp() {
+function NetworkingApp({ onPortalReset }) {
   const [loggedIn,setLoggedIn]=useState(()=>localStorage.getItem("nh_auth")==="1");
   const [screen,setScreen]=useState(()=>localStorage.getItem("nh_name")?"hub":"name");
   const [name,setName]=useState(()=>localStorage.getItem("nh_name")||"");
   const [activeModule,setActiveModule]=useState(null);
 
-  if(!loggedIn) return <LoginScreen portal="networking" onLogin={()=>{localStorage.setItem("nh_auth","1");setLoggedIn(true);}}/>;
+  if(!loggedIn) return <LoginScreen portal="networking" onLogin={()=>{localStorage.setItem("nh_auth","1");setLoggedIn(true);}} onBack={onPortalReset}/>;
 
-  const signOut=()=>{localStorage.removeItem("nh_auth");localStorage.removeItem("nh_name");setLoggedIn(false);setScreen("name");setName("");};
+  const signOut=()=>{localStorage.removeItem("nh_auth");localStorage.removeItem("nh_name");setLoggedIn(false);setScreen("name");setName("");onPortalReset();};
   const openModule=(mod)=>{ setActiveModule(mod.id); setScreen("module"); };
   const mod=MODULES.find(m=>m.id===activeModule);
   const SimComponent=activeModule?MODULE_SIMS[activeModule]:null;
@@ -2072,15 +2072,15 @@ function NetworkingApp() {
 }
 
 // ── IT SUPPORT APP ──
-function ITApp() {
+function ITApp({ onPortalReset }) {
   const [loggedIn,setLoggedIn]=useState(()=>localStorage.getItem("it_auth")==="1");
   const [screen,setScreen]=useState(()=>localStorage.getItem("it_name")?"hub":"name");
   const [name,setName]=useState(()=>localStorage.getItem("it_name")||"");
   const [activeModule,setActiveModule]=useState(null);
 
-  if(!loggedIn) return <LoginScreen portal="it" onLogin={()=>{localStorage.setItem("it_auth","1");setLoggedIn(true);}}/>;
+  if(!loggedIn) return <LoginScreen portal="it" onLogin={()=>{localStorage.setItem("it_auth","1");setLoggedIn(true);}} onBack={onPortalReset}/>;
 
-  const signOut=()=>{localStorage.removeItem("it_auth");localStorage.removeItem("it_name");setLoggedIn(false);setScreen("name");setName("");};
+  const signOut=()=>{localStorage.removeItem("it_auth");localStorage.removeItem("it_name");setLoggedIn(false);setScreen("name");setName("");onPortalReset();};
   const openModule=(mod)=>{ setActiveModule(mod.id); setScreen("module"); };
   const mod=IT_MODULES.find(m=>m.id===activeModule);
   const SimComponent=activeModule?IT_MODULE_SIMS[activeModule]:null;
@@ -2135,7 +2135,8 @@ function ITApp() {
 export default function App() {
   const [portal,setPortal]=useState(()=>localStorage.getItem("hub_portal")||null);
   const select=(p)=>{ localStorage.setItem("hub_portal",p); setPortal(p); };
+  const resetPortal=()=>{ localStorage.removeItem("hub_portal"); setPortal(null); };
   if(!portal) return <PortalScreen onSelect={select}/>;
-  if(portal==="networking") return <NetworkingApp/>;
-  return <ITApp/>;
+  if(portal==="networking") return <NetworkingApp onPortalReset={resetPortal}/>;
+  return <ITApp onPortalReset={resetPortal}/>;
 }
